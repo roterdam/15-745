@@ -1,5 +1,5 @@
 // 15-745 S15 Assignment 1: FunctionInfo.cpp
-// Group: bovik, bovik2
+// Group: mchoquet, <<<<<<>>>>>>
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/Pass.h"
@@ -19,22 +19,8 @@ class FunctionInfo : public ModulePass {
 
   // Output the function information to standard out.
   void printFunctionInfo(Module& M) {
-    outs() << "Module " << M.getModuleIdentifier().c_str() << "\n";
-    outs() << "Name,\tArgs,\tCalls,\tBlocks,\tInsns\n";
-    // TODO: Print out information about each function in this format.
-    bool is_var_arg = false;
-    size_t arg_count = 0;
-    size_t callsite_count = 0;
-    size_t block_count = 0;
-    size_t instruction_count = 0;
-    outs() << "function_name" << ",\t";
-    if (is_var_arg) {
-      outs() << "*,\t";
-    } else {
-      outs() << arg_count << ",\t";
-    }
-    outs() << callsite_count << ",\t" << block_count << ",\t"
-        << instruction_count << "\n";
+    outs() << "Module " << M.getModuleIdentifier().c_str() << "\n"
+           << "Name,\tArgs,\tCalls,\tBlocks,\tInsns\n";
   }
 
 public:
@@ -51,17 +37,23 @@ public:
   }
 
   virtual bool runOnFunction(Function &F) {
-    // TODO: implement this.
+    int numInss = 0;
+    for (BasicBlock& bb : F) {
+      numInss += bb.size();
+    }
+    outs() << F.getName() << ",\t"
+           << F.getArgumentList().size() << ",\t"
+           << F.getNumUses() << ",\t"
+           << F.size() << ",\t"
+           << numInss << "\n";
     return false;
   }
   
   virtual bool runOnModule(Module& M) {
-    errs() << "15745 Function Information Pass\n"; // TODO: remove this.
+    printFunctionInfo(M);
     for (Module::iterator MI = M.begin(), ME = M.end(); MI != ME; ++MI) {
       runOnFunction(*MI);
     }
-    // TODO: uncomment this.
-    // printFunctionInfo(M);
     return false;
   }
 
