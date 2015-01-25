@@ -41,8 +41,13 @@ public:
     for (BasicBlock& bb : F) {
       numInss += bb.size();
     }
-    outs() << F.getName() << ",\t"
-           << F.getArgumentList().size() << ",\t"
+    outs() << F.getName() << ",\t";
+    if (F.isVarArg()) {
+      outs() << "*";
+    } else {
+      outs() << F.getArgumentList().size();
+    }
+    outs() << ",\t"
            << F.getNumUses() << ",\t"
            << F.size() << ",\t"
            << numInss << "\n";
