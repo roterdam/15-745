@@ -33,14 +33,27 @@ template<typename TFunc>
 class TransferFunction {
  public:
   ~TransferFunction() { }
-  virtual void compose(const TFunc& t) = 0;
-  virtual BitVector operator()(const BitVector&) const = 0;
+  // "t1.thenCall(t2)(b)" should be equivalent to "t2(t1(b))", aka it's function
+  // composition with arguments in reverse order.
+  virtual TFunc& thenCall(const TFunc& t) = 0;
+  // t1(b) is allowed to modify and return its input argument b.
+  virtual BitVector& operator()(BitVector&) const = 0;
 };
 
 enum class FlowDirection { FORWARD, BACKWARD };
 
-typedef BitVector& (*MeetFunction)(const BitVector&, const BitVector&);
+// The meet funciton is expected to modify and return its first argument.
+typedef BitVector& (*MeetFunction)(BitVector&, const BitVector&);
+
+// The output of the dataflow program. "all program points" is implemented as a
+// map from instructions to the value at the corresponding program point, plus a
+// single special value that corresponds to the boundary condition program
+// point.
+// e.g. For forwards dataflow, map[inst] is the value just before inst, and
+//      map[boundary_point] is the value at the very end of the program.
+//      For backwards dataflow, this is reversed.
 typedef DenseMap<Instruction *, BitVector *> DataMap;
+static const Instruction *boundary_point = nullptr;
 
 // A collection of all the problem-specific arguments.
 template<typename TFunc>
@@ -60,7 +73,9 @@ struct DataflowParameters {
 template<typename TFunc>
 DataMap *dataflow(const Function& code,
                   const DataflowParameters<TFunc>& configParams) {
-  // In here, transfer functions can be created with "new TFunc(instPtr)".
+  // Our implementation of Dataflow goes here.
+
+  // NOTE: in here, transfer functions can be created with "new TFunc(instPtr)".
   return new DataMap();
 }
 

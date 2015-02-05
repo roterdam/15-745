@@ -3,16 +3,18 @@ namespace dataflow {
 /*
   Note the weird class def line for LivenessTransferFunction.
 */
-class LivenessTransferFunction : public TransferFunction<LivenessTransferFunction> {
+class LivenessTransferFunction :
+      public TransferFunction<LivenessTransferFunction> {
  public:
   LivenessTransferFunction(const Instruction *inst) { }
   ~LivenessTransferFunction() { }
  
-  void compose(const LivenessTransferFunction& other) { }
+  LivenessTransferFunction& thenCall(const LivenessTransferFunction& other) {
+    return *this;
+  }
   
-  BitVector operator()(const BitVector& bv) const {
-    BitVector bv2 = bv;
-    return bv2;
+  BitVector& operator()(BitVector& bv) const {
+    return bv;
   }
 };
 
