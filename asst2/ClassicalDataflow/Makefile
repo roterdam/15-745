@@ -2,7 +2,7 @@ all: liveness.so available.so
 
 CXXFLAGS = -std=c++11 -rdynamic $(shell llvm-config --cxxflags) -g -O0
 
-dataflow.o: dataflow.cpp dataflow.h
+dataflow.o: dataflow_fallback_framework.h dataflow.cpp
 
 available-support.o: available-support.cpp available-support.h	
 
