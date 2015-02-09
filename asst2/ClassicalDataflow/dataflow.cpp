@@ -2,149 +2,131 @@
 // Group: mchoquet, nshah, rokhinip
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "dataflow_fallback_framework.h"
+#include "dataflow.h"
+
+#include <queue>
 
 namespace llvm {
-
 namespace dataflow {
 
 
-DataFlowPass::DataFlowPass(char id, DataflowConfiguration& config):
-    FunctionPass(id),
-    _dir(config.dir),
-    _fnBuilder(config.fnBuilder),
-    _meetWith(config.meetWith),
-    _top(config.top),
-    _boundaryState(config.boundaryState) {};
+struct BlockState {
+  BitVector in;
+  BitVector out;
+};
+typedef DenseMap<const BasicBlock *, BlockState> BlockStateMap;
 
-void displayBlockStates(BlockStates& BS){
-    // Pretty printing code
+static void initializeBlockStates(const Function&, BlockStateMap&,
+                                  const DataflowConfiguration&);
+static DataMap& traverseBackwards(const Function&, BlockStateMap&,
+                                   const DataflowConfiguration&);
+static DataMap& traverseForwards(const Function&, BlockStateMap&,
+                                  const DataflowConfiguration&);
+
+
+// The toplevel dataflow function.
+DataMap& dataflow(const Function& F,
+                  const DataflowConfiguration& config) {
+    BlockStateMap blockStates;
+    initializeBlockStates(F, blockStates, config);
+
+    if (config.dir == FORWARD) {
+        return traverseForwards(F, blockStates, config);
+    } else {
+        return traverseBackwards(F, blockStates, config);
+    }
 }
 
-void DataFlowPass::traverseBackwards(Function &F, BlockStates& blockStates){
-    
-    std::queue<BasicBlock *>work_queue; 
+
+// Sets the initial conditions for the given dataflow problem.
+void initializeBlockStates(const Function& F, BlockStateMap& blockStates,
+                           const DataflowConfiguration& config) {
+    if (config.dir == FORWARD) {
+        for (const BasicBlock& B : F) {
+            blockStates[&B].out = config.top;
+        }
+        blockStates[&(F.getEntryBlock())].out = config.boundaryState;
+    } else {
+        for (const BasicBlock& B : F) {
+            blockStates[&B].in = config.top;
+        }
+        // Here we assume that there is a single exit block.
+        blockStates[&(F.back())].in = config.boundaryState;
+    }
+}
+
+
+// TODO: try the backwards reverse postorder iterator from piazza.
+DataMap& traverseBackwards(const Function& F, BlockStateMap& blockStates,
+                           const DataflowConfiguration& config) {
+    // Find a solution for the start of all the blocks.
+    std::queue<const BasicBlock *>work_queue; 
     work_queue.push(&F.back());
 
-    while (!work_queue.empty()){
-        BasicBlock *block = work_queue.front();
+    while (!work_queue.empty()) {
+        const BasicBlock *b = work_queue.front();
         work_queue.pop();
        
-        // out[b] = meet op (in[p] for all predecessors p)
-        BitVector initMeet = _top; 
-        for (auto it = succ_begin(block), et = succ_end(block);
-             it != et; ++it){
-             BasicBlock *p = *it;
-             initMeet = _meetWith(blockStates[p].in, initMeet);
+        // Meet in[s] for all successors s of b, and store in out[b].
+        BitVector newOut = config.top; 
+        for (auto it = succ_begin(b), et = succ_end(b); it != et; ++it) {
+             newOut = config.meetWith(newOut, blockStates[*it].in);
         }
-        blockStates[block].out = initMeet;
+        blockStates[b].out = newOut;
 
-        // oldin = in[b]
-        BitVector& oldin = blockStates[block].in;
+        // Set in[b] = f(out[b]).
+        BitVector oldIn = blockStates[b].in;
+        BitVector newIn = (*(config.fnBuilder->makeBlockTransferFn(b)))(newOut);
+        blockStates[b].in = newIn;        
 
-        // in[b] = f_b(out[b])
-        TransferFunction *fn = _fnBuilder->makeBlockTransferFn(block);
-        BitVector& newin = (*fn)(blockStates[block].out);
-
-        // if (oldin != in[b]) 
-        //      for all predecessors p of b, add p to work queue
-        if (newin != oldin){
-
-            for (auto it = pred_begin(block), et = pred_begin(block);
-                 it != et; ++it){
-                BasicBlock *p = *it;
-                work_queue.push(p);
+        // If in[b] changed, add all predecessors of b to the work queue.
+        if (newIn != oldIn){
+            for (auto it = pred_begin(b), et = pred_begin(b); it != et; ++it) {
+                work_queue.push(*it);
             }
         }
     }
+
+    // Loop through the blocks to get a solution at every program point.
+    DataMap *d = new DataMap();
+    return *d;
 }
 
-// Generalized from the worklist algorithm used 
-// for reaching defintions (from Lecture 4)
-void DataFlowPass::traverseForwards(Function &F, BlockStates& blockStates){
 
-    std::queue<BasicBlock *>work_queue; 
+// TODO: try the reverse postorder iterator from piazza.
+DataMap& traverseForwards(const Function& F, BlockStateMap& blockStates,
+                          const DataflowConfiguration& config) {
+    // Find a solution for the start of all the blocks.
+    std::queue<const BasicBlock *>work_queue; 
     work_queue.push(&F.front());
 
-    while (!work_queue.empty()){
-        BasicBlock *block = work_queue.front();
+    while (!work_queue.empty()) {
+        const BasicBlock *b = work_queue.front();
         work_queue.pop();
        
-        // in[b] = meet op (out[p] for all predecessors p)
-        BitVector initMeet = _top; 
-        for (auto it = pred_begin(block), et = pred_end(block);
-             it != et; ++it){
-             BasicBlock *p = *it;
-             initMeet = _meetWith(blockStates[p].out, initMeet);
+        // Meet out[p] for all predecessors p of b, and store in in[b].
+        BitVector newIn = config.top;
+        for (auto it = pred_begin(b), et = pred_end(b); it != et; ++it) {
+             newIn = config.meetWith(newIn, blockStates[*it].out);
         }
-        blockStates[block].in = initMeet;
+        blockStates[b].in = newIn;
 
-        // oldout = out[b]
-        BitVector& oldout = blockStates[block].out;
+        // Set out[b] = f(in[b]).
+        BitVector oldOut = blockStates[b].out;
+        BitVector newOut = (*(config.fnBuilder->makeBlockTransferFn(b)))(newIn);
+        blockStates[b].out = newOut;
 
-        // out[b] = f_b(in[b])
-        TransferFunction *fn = _fnBuilder->makeBlockTransferFn(block);
-        BitVector& newout = (*fn)(blockStates[block].in);
-
-        // if (oldout != out[b]) 
-        //      for all successors s of b, add s to work queue
-        if (oldout != newout){
-
-            for (auto it = succ_begin(block), et = succ_end(block);
-                 it != et; ++it){
-                BasicBlock *s = *it;
-                work_queue.push(s);
+        // If out[b] changed, add all succesors of b to the work queue.
+        if (newOut != oldOut) {
+            for (auto it = succ_begin(b), et = succ_end(b); it != et; ++it) {
+                work_queue.push(*it);
             }
         }
     }
-}
 
-void DataFlowPass::initializeBasicBlocks(Function &F, BlockStates &blockStates){
-    for (BasicBlock& B: F){
-        if (_dir == FORWARD){
-            // We use the name of the basic block since it is 
-            // a unique identifier in a function
-            if (B.getName() == F.front().getName()){
-                blockStates[&B].out = _boundaryState; 
-            } else {
-                blockStates[&B].out = _top;
-            }
-        } else { 
-            // We use the name of the basic block since it is 
-            // a unique identifier in a function
-            if (B.getName() == F.back().getName()){
-                blockStates[&B].in = _boundaryState;
-            } else {
-                blockStates[&B].in = _top;
-            }
-        }
-    }
-}
-
-bool DataFlowPass::runOnFunction(Function &F){
-    
-    /* 1. Build CFG (done by virtue of LLVM)
-     * 2. For each basic block, depending on the 
-     *    direction, initialize the state of the block
-     *    if _dir == BACKWARD:
-     *      in[exit] = boundaryState;
-     *      in[b] = top forall BasicBlock b
-     * 3. Loop through graph applying transfer and meet 
-     *    functions until convergence
-     */
-    
-    BlockStates BS;
-    initializeBasicBlocks(F, BS);
-
-    if (_dir == FORWARD){
-        traverseForwards(F, BS);
-    } else {
-        traverseBackwards(F, BS);
-    }
-    
-    outs() << F.getName() << "\n";
-    displayBlockStates(BS);
-    return true;
+    // Loop through the blocks to get a solution at every program point.
+    DataMap *d = new DataMap();
+    return *d;
 }
 
 
