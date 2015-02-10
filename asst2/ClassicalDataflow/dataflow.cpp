@@ -4,7 +4,11 @@
 
 #include "dataflow.h"
 
+#include <iostream>
 #include <queue>
+
+using std::cout;
+using std::endl;
 
 namespace llvm {
 namespace dataflow {
@@ -128,6 +132,28 @@ DataMap& traverseForwards(const Function& F, BlockStateMap& blockStates,
     DataMap *d = new DataMap();
     return *d;
 }
+
+
+void printDataMap(const DataMap& dataMap, const FlowDirection dir) {
+  cout << "print not implemented" << endl;
+}
+
+const BitVector onesVector(const unsigned int n) {
+  return BitVector(n, true);
+}
+
+const BitVector zerosVector(const unsigned int n) {
+  return BitVector(n, false);
+}
+
+BitVector& bvIntersect(BitVector& v1, const BitVector& v2) {
+  return v1 &= v2;
+}
+
+BitVector& bvUnion(BitVector& v1, const BitVector& v2) {
+  return v1 |= v2;
+}
+
 
 
 } // namespace dataflow

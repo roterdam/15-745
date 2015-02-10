@@ -55,8 +55,13 @@ typedef DenseMap<Instruction *, BitVector *> DataMap;
 static const Instruction *boundary_point = nullptr;
 
 
-// Dataflow function.
+// Dataflow functions
 DataMap& dataflow(const Function& code, const DataflowConfiguration& config);
+void printDataMap(const DataMap& dataMap, const FlowDirection dir);
+const BitVector onesVector(const unsigned int n);
+const BitVector zerosVector(const unsigned int n);
+BitVector& bvIntersect(BitVector& v1, const BitVector& v2);
+BitVector& bvUnion(BitVector& v1, const BitVector& v2);
 
 } // namespace dataflow
 } // namespace llvm
