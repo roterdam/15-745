@@ -4,11 +4,9 @@
 
 #include "dataflow.h"
 
-#include <iostream>
-#include <queue>
+#include "llvm/Support/raw_ostream.h"
 
-using std::cout;
-using std::endl;
+#include <queue>
 
 namespace llvm {
 namespace dataflow {
@@ -20,12 +18,13 @@ struct BlockState {
 };
 typedef DenseMap<const BasicBlock *, BlockState> BlockStateMap;
 
+static void printFunctionSignature(const Function&);
 static void initializeBlockStates(const Function&, BlockStateMap&,
                                   const DataflowConfiguration&);
 static DataMap& traverseBackwards(const Function&, BlockStateMap&,
-                                   const DataflowConfiguration&);
-static DataMap& traverseForwards(const Function&, BlockStateMap&,
                                   const DataflowConfiguration&);
+static DataMap& traverseForwards(const Function&, BlockStateMap&,
+                                 const DataflowConfiguration&);
 
 
 // The toplevel dataflow function.
@@ -39,6 +38,72 @@ DataMap& dataflow(const Function& F,
     } else {
         return traverseBackwards(F, blockStates, config);
     }
+}
+
+void printDataMap(const Function& F, const DataMap& dataMap,
+                  const FlowDirection dir, void (*printBV)(const BitVector&)) {
+  printFunctionSignature(F);
+  for (const BasicBlock& B : F) {
+    B.printAsOperand(outs());
+    outs() << ":\n";
+    if (dir == FORWARD && &B == F.begin()) {
+      outs() << "--> ";
+      printBV(*(dataMap.lookup(boundary_point)));
+    }
+    for (const Instruction& I : B) {
+      if (dir == FORWARD) {
+        I.print(outs());
+        outs() << "\n";
+      }
+      if (!isa<PHINode>(&I)) {
+        outs() << "--> ";
+        printBV(*(dataMap.lookup(&I)));
+      }
+      if (dir == BACKWARD) {
+        I.print(outs());
+        outs() << "\n";
+      }
+    }
+  }
+  if (dir == BACKWARD) {
+    outs() << "--> ";
+    printBV(*(dataMap.lookup(boundary_point)));
+  }
+  outs() << "}\n";
+}
+
+const BitVector onesVector(const unsigned int n) {
+  return BitVector(n, true);
+}
+
+const BitVector zerosVector(const unsigned int n) {
+  return BitVector(n, false);
+}
+
+BitVector& bvIntersect(BitVector& v1, const BitVector& v2) {
+  return v1 &= v2;
+}
+
+BitVector& bvUnion(BitVector& v1, const BitVector& v2) {
+  return v1 |= v2;
+}
+
+
+/////// private functions
+
+
+void printFunctionSignature(const Function& F) {
+  F.printAsOperand(outs());
+  outs() << "(";
+  bool firstRound = true;
+  for (const Argument& A : F.args()) {
+    if (!firstRound) {
+      outs() << ", ";
+    }
+    A.print(outs());
+    firstRound = false;
+  }
+  outs() << ") {\n";
 }
 
 
@@ -85,7 +150,7 @@ DataMap& traverseBackwards(const Function& F, BlockStateMap& blockStates,
 
         // If in[b] changed, add all predecessors of b to the work queue.
         if (newIn != oldIn){
-            for (auto it = pred_begin(b), et = pred_begin(b); it != et; ++it) {
+            for (auto it = pred_begin(b), et = pred_end(b); it != et; ++it) {
                 work_queue.push(*it);
             }
         }
@@ -133,26 +198,6 @@ DataMap& traverseForwards(const Function& F, BlockStateMap& blockStates,
     return *d;
 }
 
-
-void printDataMap(const DataMap& dataMap, const FlowDirection dir) {
-  cout << "print not implemented" << endl;
-}
-
-const BitVector onesVector(const unsigned int n) {
-  return BitVector(n, true);
-}
-
-const BitVector zerosVector(const unsigned int n) {
-  return BitVector(n, false);
-}
-
-BitVector& bvIntersect(BitVector& v1, const BitVector& v2) {
-  return v1 &= v2;
-}
-
-BitVector& bvUnion(BitVector& v1, const BitVector& v2) {
-  return v1 |= v2;
-}
 
 
 

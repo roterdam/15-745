@@ -23,6 +23,7 @@ struct TranslationMaps {
 
 static TranslationMaps getOperandMaps(const Function&);
 static vector<const Value *> getValuesUsedInFunction(const Function&);
+static void printLiveSet(const BitVector&);
 
 
 class LivenessTransferFunction : public dataflow::TransferFunction {
@@ -98,7 +99,8 @@ class Liveness : public FunctionPass {
 
     dataflow::DataMap& out = dataflow::dataflow(F, config);
 
-    dataflow::printDataMap(out, config.dir);
+    dataflow::printDataMap(F, out, config.dir, printLiveSet);
+    outs() << "\n";
 
     delete bitMap;
     delete valMap;
@@ -122,7 +124,7 @@ TranslationMaps getOperandMaps(const Function& F) {
   int current = 0;
 
   for (const Value *v : getValuesUsedInFunction(F)) {
-    // TODO: this if shouldn't be necessary, verify later.
+    // TODO: this shouldn't be necessary, verify later.
     if (bitMap->count(v) == 0) {
       (*bitMap)[v] = current;
       (*valMap)[current] = v;
@@ -155,6 +157,10 @@ vector<const Value *> getValuesUsedInFunction(const Function& F) {
   int newSize = newEnd - v.begin();
   v.resize(newSize);
   return v;
+}
+
+static void printLiveSet(const BitVector&) {
+  outs() << "{...}\n";
 }
 
 char Liveness::ID = 0;
