@@ -13,6 +13,7 @@ namespace dataflow {
 
 
 struct BlockState {
+  vector<const PHINode *> phis;
   BitVector in;
   BitVector out;
 };
@@ -123,6 +124,13 @@ void initializeBlockStates(const Function& F, BlockStateMap& blockStates,
     }
 }
 
+/*
+  HOW TO HANDLE PHI INSTRUCTIONS:
+    Treat them as being between blocks, rather than within any block.
+    Each block still only has a single in[B] and out[B].
+    During the "gather" phase, blocks execute the phi functions for the
+      corresponding edge in the control flow graph.
+*/
 
 // TODO: try the backwards reverse postorder iterator from piazza.
 DataMap *traverseBackwards(const Function& F, BlockStateMap& blockStates,
@@ -135,42 +143,44 @@ DataMap *traverseBackwards(const Function& F, BlockStateMap& blockStates,
     } 
 
     while (!work_queue.empty()) {
-        const BasicBlock *b = work_queue.front();
+        const BasicBlock *B = work_queue.front();
         work_queue.pop();
-        b->printAsOperand(outs());
-        outs() << ":\n";
        
         // Meet in[s] for all successors s of b, and store in out[b].
-        BitVector newOut = config.top; 
-        for (auto it = succ_begin(b), et = succ_end(b); it != et; ++it) {
-            newOut = config.meetWith(newOut, blockStates[*it].in);
-            outs() << "  ";
-            (*it)->printAsOperand(outs());
-            outs() << "\n";
+        BitVector newOut = config.top;
+        for (auto it = succ_begin(B), et = succ_end(B); it != et; ++it) {
+            const BasicBlock* S = *it;
+            BitVector succBV = blockStates[S].in;
+            const vector<const PHINode *> ps = blockStates[S].phis;
+            succBV = (*(config.fnBuilder->makePhiSeqTransferFn(ps, B)))(succBV);
+            newOut = config.meetWith(newOut, succBV);
+            // outs() << "  ";
+            // (*it)->printAsOperand(outs());
+            // outs() << "\n";
         }
-        blockStates[b].out = newOut;
+        blockStates[B].out = newOut;
 
         // Set in[b] = f(out[b]).
-        BitVector oldIn = blockStates[b].in;
+        BitVector oldIn = blockStates[B].in;
         BitVector newIn = newOut;
-        newIn = (*(config.fnBuilder->makeBlockTransferFn(b)))(newIn);
-        blockStates[b].in = newIn;
-        printBitVector(newOut);
-        outs() << "\n";
-        printBitVector(oldIn);
-        outs() << "\n";
-        printBitVector(newIn);
-        outs() << "\n";
+        newIn = (*(config.fnBuilder->makeBlockTransferFn(B)))(newIn);
+        blockStates[B].in = newIn;
+        // printBitVector(newOut);
+        // outs() << "\n";
+        // printBitVector(oldIn);
+        // outs() << "\n";
+        // printBitVector(newIn);
+        // outs() << "\n";
 
 
         // If in[b] changed, add all predecessors of b to the work queue.
         if (newIn != oldIn){
-            outs() << "different!\n";
-            for (auto it = pred_begin(b), et = pred_end(b); it != et; ++it) {
+            // outs() << "different!\n";
+            for (auto it = pred_begin(B), et = pred_end(B); it != et; ++it) {
                 work_queue.push(*it);
-                outs() << "  ";
-                (*it)->printAsOperand(outs());
-                outs() << "\n";
+                // outs() << "  ";
+                // (*it)->printAsOperand(outs());
+                // outs() << "\n";
             }
         }
     }

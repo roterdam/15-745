@@ -64,6 +64,11 @@ class LivenessTFBuilder : public dataflow::TransferFunctionBuilder {
     }
     return new LivenessTransferFunction(killBV, genBV);
   }
+  
+  LivenessTransferFunction *makePhiSeqTransferFn(const vector<const PHINode *>& phis,
+                                                 const BasicBlock *prevBlock) {
+    return nullptr;
+  }
 
   dataflow::TransferFunction *makeBlockTransferFn(
       const BasicBlock *b) const {
