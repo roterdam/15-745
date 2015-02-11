@@ -1,0 +1,98 @@
+\documentclass[11pt]{article}
+\usepackage{enumerate}
+\usepackage{tikz}
+\usepackage{fullpage}
+\usepackage{fancyhdr}
+\usepackage{graphicx}
+
+\usepackage{amsmath, amsfonts, amsthm, amssymb}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{5pt plus 1pt}
+\pagestyle{empty}
+
+\def\indented#1{\list{}{}\item[]}
+\let\indented=\endlist
+
+\newcounter{questionCounter}
+\newcounter{partCounter}[questionCounter]
+\newenvironment{question}[2][\arabic{questionCounter}]{%
+    \setcounter{partCounter}{0}%
+    \vspace{.25in} \hrule \vspace{0.5em}%
+        \noindent{\bf #2}%
+    \vspace{0.8em} \hrule \vspace{.10in}%
+    \addtocounter{questionCounter}{1}%
+}{}
+\renewenvironment{part}[1][\alph{partCounter}]{%
+    \addtocounter{partCounter}{1}%
+    \vspace{.10in}%
+    \begin{indented}%
+       {\bf (#1)} %
+}{\end{indented}}
+
+%%%%%%%%%%%%%%%%% Identifying Information %%%%%%%%%%%%%%%%%
+%% This is here, so that you can make your homework look %%
+%% pretty when you compile it.                           %%
+%%     DO NOT PUT YOUR NAME ANYWHERE ELSE!!!!            %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\newcommand{\myname}{Michael Choquette, Rokhini Prabhu}
+\newcommand{\myandrew}{mchoquet, rokhinip}
+\newcommand{\myhwname}{Assignment 2}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{document}
+\thispagestyle{plain}
+
+\begin{center}
+{\Large \myhwname} \\
+\myname \\
+\myandrew \\
+\today
+\end{center}
+
+\newcommand{\code}[1]{\texttt{#1}}
+\begin{question}{Writeup}
+\end{question}
+\begin{question}{Lazy Code Motion}
+\begin{center}
+\begin{tikzpicture}[scale=0.2]
+\tikzstyle{every node}+=[inner sep=0pt]
+\draw [black] (41.3,-6.9) circle (3);
+\draw (41.3,-6.9) node {$entry$};
+\draw [black] (41.2,-17.3) circle (3);
+\draw (41.2,-17.3) node {$1$};
+\draw [black] (24.1,-24.2) circle (3);
+\draw (24.1,-24.2) node {$3$};
+\draw [black] (24.3,-36.2) circle (3);
+\draw (24.3,-36.2) node {$4$};
+\draw [black] (56.7,-32) circle (3);
+\draw (56.7,-32) node {$6$};
+\draw [black] (41.3,-46.6) circle (3);
+\draw (41.3,-46.6) node {$8$};
+\draw [black] (41.3,-56.2) circle (3);
+\draw (41.3,-56.2) node {$9$};
+\draw [black] (49.7,-39.7) circle (3);
+\draw [black] (32.3,-42.4) circle (3);
+\draw [black] (41.27,-9.9) -- (41.23,-14.3);
+\fill [black] (41.23,-14.3) -- (41.74,-13.5) -- (40.74,-13.5);
+\draw [black] (38.3,-18.5) -- (26.88,-23.08);
+\fill [black] (26.88,-23.08) -- (27.81,-23.25) -- (27.44,-22.32);
+\draw [black] (24.15,-27.2) -- (24.25,-33.2);
+\fill [black] (24.25,-33.2) -- (24.74,-32.39) -- (23.74,-32.41);
+\draw [black] (43.9,-18.8) -- (54.61,-29.85);
+\fill [black] (54.61,-29.85) -- (54.41,-28.92) -- (53.7,-29.62);
+\draw [black] (34.8,-43.6) -- (38.58,-45.34);
+\fill [black] (38.58,-45.34) -- (38.06,-44.55) -- (37.64,-45.46);
+\draw [black] (47.4,-41.7) -- (43.64,-44.72);
+\fill [black] (43.64,-44.72) -- (44.58,-44.61) -- (43.95,-43.83);
+\draw [black] (41.3,-49.6) -- (41.3,-53.2);
+\fill [black] (41.3,-53.2) -- (41.8,-52.4) -- (40.8,-52.4);
+\draw [black] (54.5,-34) -- (51.63,-37.41);
+\fill [black] (51.63,-37.41) -- (52.53,-37.12) -- (51.77,-36.47);
+\draw [black] (26.6,-38.5) -- (29.82,-40.71);
+\fill [black] (29.82,-40.71) -- (29.45,-39.84) -- (28.88,-40.67);
+\end{tikzpicture}
+\end{center}
+\end{question}
+\begin{question}{Loop Invariant Code Motion}
+\end{question}
+\end{document}
