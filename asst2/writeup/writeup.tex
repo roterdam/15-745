@@ -53,8 +53,22 @@
 \begin{question}{Writeup}
 \end{question}
 \begin{question}{Lazy Code Motion}
+
+After the Anticipated expressions pass: Each block is annotated with 
+the in and out values of \texttt{anticipated}
 \begin{center}
 \includegraphics[scale=0.5]{cfg1.jpg}
+\end{center}
+
+After the Early Placement pass: Each block is annotated with the values 
+of \texttt{earliest} for that block.
+\begin{center}
+\includegraphics[scale=0.5]{cfg2.jpg}
+\end{center}
+
+After Lazy Code Motion and cleanup passes:
+\begin{center}
+\includegraphics[scale=0.5]{cfg3.jpg}
 \end{center}
 \end{question}
 \begin{question}{Loop Invariant Code Motion}
