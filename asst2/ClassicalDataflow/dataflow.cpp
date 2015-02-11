@@ -21,15 +21,14 @@ typedef DenseMap<const BasicBlock *, BlockState> BlockStateMap;
 static void printFunctionSignature(const Function&);
 static void initializeBlockStates(const Function&, BlockStateMap&,
                                   const DataflowConfiguration&);
-static DataMap& traverseBackwards(const Function&, BlockStateMap&,
+static DataMap *traverseBackwards(const Function&, BlockStateMap&,
                                   const DataflowConfiguration&);
-static DataMap& traverseForwards(const Function&, BlockStateMap&,
+static DataMap *traverseForwards(const Function&, BlockStateMap&,
                                  const DataflowConfiguration&);
-
+static void printBitVector(const BitVector&);
 
 // The toplevel dataflow function.
-DataMap& dataflow(const Function& F,
-                  const DataflowConfiguration& config) {
+DataMap *dataflow(const Function& F, const DataflowConfiguration& config) {
     BlockStateMap blockStates;
     initializeBlockStates(F, blockStates, config);
 
@@ -48,7 +47,7 @@ void printDataMap(const Function& F, const DataMap& dataMap,
     outs() << ":\n";
     if (dir == FORWARD && &B == F.begin()) {
       outs() << "--> ";
-      printBV(*(dataMap.lookup(boundary_point)));
+      printBV(dataMap.lookup(boundary_point));
     }
     for (const Instruction& I : B) {
       if (dir == FORWARD) {
@@ -57,7 +56,7 @@ void printDataMap(const Function& F, const DataMap& dataMap,
       }
       if (!isa<PHINode>(&I)) {
         outs() << "--> ";
-        printBV(*(dataMap.lookup(&I)));
+        printBV(dataMap.lookup(&I));
       }
       if (dir == BACKWARD) {
         I.print(outs());
@@ -67,7 +66,7 @@ void printDataMap(const Function& F, const DataMap& dataMap,
   }
   if (dir == BACKWARD) {
     outs() << "--> ";
-    printBV(*(dataMap.lookup(boundary_point)));
+    printBV(dataMap.lookup(boundary_point));
   }
   outs() << "}\n";
 }
@@ -114,19 +113,19 @@ void initializeBlockStates(const Function& F, BlockStateMap& blockStates,
         for (const BasicBlock& B : F) {
             blockStates[&B].out = config.top;
         }
-        blockStates[&(F.getEntryBlock())].out = config.boundaryState;
+        blockStates[&(F.getEntryBlock())].in = config.boundaryState;
     } else {
         for (const BasicBlock& B : F) {
             blockStates[&B].in = config.top;
         }
         // Here we assume that there is a single exit block.
-        blockStates[&(F.back())].in = config.boundaryState;
+        blockStates[&(F.back())].out = config.boundaryState;
     }
 }
 
 
 // TODO: try the backwards reverse postorder iterator from piazza.
-DataMap& traverseBackwards(const Function& F, BlockStateMap& blockStates,
+DataMap *traverseBackwards(const Function& F, BlockStateMap& blockStates,
                            const DataflowConfiguration& config) {
     // Find a solution for the start of all the blocks.
     std::queue<const BasicBlock *>work_queue; 
@@ -156,14 +155,39 @@ DataMap& traverseBackwards(const Function& F, BlockStateMap& blockStates,
         }
     }
 
+    outs() << "----------------\n";
+    for (auto it = blockStates.begin(), et = blockStates.end(); it != et; ++it){
+      const BasicBlock *block = (*it).first;
+      BlockState state = (*it).second;
+      block->printAsOperand(outs());
+      outs() << ":\n";
+      outs() << "in: ";
+      printBitVector(state.in);
+      outs() << "\nout: ";
+      printBitVector(state.out);
+      outs() << "\n";
+    }
+    outs() << "----------------\n";
+
     // Loop through the blocks to get a solution at every program point.
     DataMap *d = new DataMap();
-    return *d;
+    for (const BasicBlock& B : F) {
+      BitVector bv = blockStates[&B].out;
+      for (auto it = B.rbegin(), et = B.rend(); it != et; ++it) {
+        const Instruction *I = &*it;
+        if (!isa<PHINode>(I)) {
+          bv = (*(config.fnBuilder->makeInstTransferFn(I)))(bv);
+          (*d)[I] = bv;
+        }
+      }
+    }
+    (*d)[boundary_point] = blockStates[&(F.back())].out;
+    return d;
 }
 
 
 // TODO: try the reverse postorder iterator from piazza.
-DataMap& traverseForwards(const Function& F, BlockStateMap& blockStates,
+DataMap *traverseForwards(const Function& F, BlockStateMap& blockStates,
                           const DataflowConfiguration& config) {
     // Find a solution for the start of all the blocks.
     std::queue<const BasicBlock *>work_queue; 
@@ -195,9 +219,14 @@ DataMap& traverseForwards(const Function& F, BlockStateMap& blockStates,
 
     // Loop through the blocks to get a solution at every program point.
     DataMap *d = new DataMap();
-    return *d;
+    return d;
 }
 
+void printBitVector(const BitVector& bv) {
+  for (int i = 0; i < bv.size(); i++) {
+    outs() << (bv[i] ? "1" : "0"); 
+  }
+}
 
 
 

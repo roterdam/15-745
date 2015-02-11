@@ -23,6 +23,7 @@ struct TranslationMaps {
 
 static TranslationMaps getOperandMaps(const Function&);
 static vector<const Value *> getValuesUsedInFunction(const Function&);
+static bool isTracked(const Value *);
 static void printLiveSet(const BitVector&);
 
 
@@ -52,9 +53,14 @@ class LivenessTFBuilder : public dataflow::TransferFunctionBuilder {
       const Instruction *inst) const {
     BitVector killBV(_n, false);
     BitVector genBV(_n, false);
-    killBV.set(_bitMap.lookup(inst));
+    if (_bitMap.count(inst) != 0) {
+      killBV.set(_bitMap.lookup(inst));
+    }
     for (auto it = inst->op_begin(), et = inst->op_end(); it != et; ++it) {
-      genBV.set(_bitMap.lookup((*it).get()));
+      Value *v = (*it).get();
+      if (_bitMap.count(v) != 0) {
+        genBV.set(_bitMap.lookup(v));
+      }
     }
     return new LivenessTransferFunction(killBV, genBV);
   }
@@ -65,9 +71,14 @@ class LivenessTFBuilder : public dataflow::TransferFunctionBuilder {
     BitVector genBV(_n, false);
     for (auto it = b->rbegin(), et = b->rend(); it != et; ++it) {
       const Instruction *I = &*it;
-      killBV.set(_bitMap.lookup(I));
+      if (_bitMap.count(I) != 0) {
+        killBV.set(_bitMap.lookup(I));
+      }
       for (auto it = I->op_begin(), et = I->op_end(); it != et; ++it) {
-        genBV.set(_bitMap.lookup((*it).get()));
+        Value *v = (*it).get();
+        if (_bitMap.count(v) != 0) {
+          genBV.set(_bitMap.lookup(v));
+        }
       }
     }
     return new LivenessTransferFunction(killBV, genBV);
@@ -94,17 +105,18 @@ class Liveness : public FunctionPass {
     config.dir = dataflow::FlowDirection::BACKWARD;
     config.fnBuilder = new LivenessTFBuilder(*bitMap);
     config.meetWith = dataflow::bvIntersect;
-    config.top = dataflow::onesVector(maps.bitMap->size());
+    config.top = dataflow::zerosVector(maps.bitMap->size());
     config.boundaryState = dataflow::zerosVector(maps.bitMap->size());
 
-    dataflow::DataMap& out = dataflow::dataflow(F, config);
+    dataflow::DataMap *out = dataflow::dataflow(F, config);
 
-    dataflow::printDataMap(F, out, config.dir, printLiveSet);
-    outs() << "\n";
+    dataflow::printDataMap(F, *out, config.dir, printLiveSet);
+    outs() << "\n\n";
 
     delete bitMap;
     delete valMap;
     delete config.fnBuilder;
+    delete out;
 
     return false;
   }
@@ -124,10 +136,13 @@ TranslationMaps getOperandMaps(const Function& F) {
   int current = 0;
 
   for (const Value *v : getValuesUsedInFunction(F)) {
+    v->printAsOperand(outs());
+    outs() << "\n";
     // TODO: this shouldn't be necessary, verify later.
     if (bitMap->count(v) == 0) {
       (*bitMap)[v] = current;
       (*valMap)[current] = v;
+      current++;
     }
   }
 
@@ -146,9 +161,13 @@ vector<const Value *> getValuesUsedInFunction(const Function& F) {
   }
   for (const BasicBlock& B : F) {
     for (const Instruction& I : B) {
-      v.push_back(&I);
+      if (isTracked(&I)) {
+        v.push_back(&I);
+      }
       for (auto it = I.op_begin(), et = I.op_end(); it != et; ++it) {
-        v.push_back((*it).get());
+        if (isTracked((*it).get())) {
+          v.push_back((*it).get());
+        }
       }
     }
   }
@@ -159,8 +178,20 @@ vector<const Value *> getValuesUsedInFunction(const Function& F) {
   return v;
 }
 
-static void printLiveSet(const BitVector&) {
-  outs() << "{...}\n";
+bool isTracked(const Value *v) {
+  const Type *tp = v->getType();
+  return ((isa<Instruction>(v) || isa<Argument>(v)) &&
+          (!(tp->isVoidTy() || tp->isLabelTy() ||
+             tp->isMetadataTy() || tp->isFunctionTy())));
+}
+
+
+void printLiveSet(const BitVector& v) {
+  outs() << "{";
+  for (int i = 0; i < v.size(); i++) {
+    outs() << (v[i] ? "1" : "0");
+  }
+  outs() << "}\n";
 }
 
 char Liveness::ID = 0;

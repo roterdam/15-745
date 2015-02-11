@@ -51,12 +51,12 @@ struct DataflowConfiguration {
 // e.g. For forwards dataflow, map[inst] is the value just before inst, and
 //      map[boundary_point] is the value at the very end of the program.
 //      For backwards dataflow, this is reversed.
-typedef DenseMap<const Instruction *, BitVector *> DataMap;
+typedef DenseMap<const Instruction *, BitVector> DataMap;
 static const Instruction *boundary_point = nullptr;
 
 
 // Dataflow functions
-DataMap& dataflow(const Function& F, const DataflowConfiguration& config);
+DataMap *dataflow(const Function& F, const DataflowConfiguration& config);
 void printDataMap(const Function& F, const DataMap& dataMap,
                   const FlowDirection dir, void (*printBV)(const BitVector&));
 const BitVector onesVector(const unsigned int n);
