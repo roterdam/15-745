@@ -128,29 +128,49 @@ void initializeBlockStates(const Function& F, BlockStateMap& blockStates,
 DataMap *traverseBackwards(const Function& F, BlockStateMap& blockStates,
                            const DataflowConfiguration& config) {
     // Find a solution for the start of all the blocks.
-    std::queue<const BasicBlock *>work_queue; 
-    work_queue.push(&F.back());
+    std::queue<const BasicBlock *>work_queue;
+    // TODO: explore the blocks in a better order.
+    for (auto it = F.begin(), et = F.end(); it != et; ++it) {
+      work_queue.push(&*it);
+    } 
 
     while (!work_queue.empty()) {
         const BasicBlock *b = work_queue.front();
         work_queue.pop();
+        b->printAsOperand(outs());
+        outs() << ":\n";
        
         // Meet in[s] for all successors s of b, and store in out[b].
         BitVector newOut = config.top; 
         for (auto it = succ_begin(b), et = succ_end(b); it != et; ++it) {
-             newOut = config.meetWith(newOut, blockStates[*it].in);
+            newOut = config.meetWith(newOut, blockStates[*it].in);
+            outs() << "  ";
+            (*it)->printAsOperand(outs());
+            outs() << "\n";
         }
         blockStates[b].out = newOut;
 
         // Set in[b] = f(out[b]).
         BitVector oldIn = blockStates[b].in;
-        BitVector newIn = (*(config.fnBuilder->makeBlockTransferFn(b)))(newOut);
-        blockStates[b].in = newIn;        
+        BitVector newIn = newOut;
+        newIn = (*(config.fnBuilder->makeBlockTransferFn(b)))(newIn);
+        blockStates[b].in = newIn;
+        printBitVector(newOut);
+        outs() << "\n";
+        printBitVector(oldIn);
+        outs() << "\n";
+        printBitVector(newIn);
+        outs() << "\n";
+
 
         // If in[b] changed, add all predecessors of b to the work queue.
         if (newIn != oldIn){
+            outs() << "different!\n";
             for (auto it = pred_begin(b), et = pred_end(b); it != et; ++it) {
                 work_queue.push(*it);
+                outs() << "  ";
+                (*it)->printAsOperand(outs());
+                outs() << "\n";
             }
         }
     }

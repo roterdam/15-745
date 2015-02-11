@@ -72,7 +72,9 @@ class LivenessTFBuilder : public dataflow::TransferFunctionBuilder {
     for (auto it = b->rbegin(), et = b->rend(); it != et; ++it) {
       const Instruction *I = &*it;
       if (_bitMap.count(I) != 0) {
-        killBV.set(_bitMap.lookup(I));
+        const int i = _bitMap.lookup(I);
+        genBV.reset(i);
+        killBV.set(i);
       }
       for (auto it = I->op_begin(), et = I->op_end(); it != et; ++it) {
         Value *v = (*it).get();
@@ -104,7 +106,7 @@ class Liveness : public FunctionPass {
     dataflow::DataflowConfiguration config;
     config.dir = dataflow::FlowDirection::BACKWARD;
     config.fnBuilder = new LivenessTFBuilder(*bitMap);
-    config.meetWith = dataflow::bvIntersect;
+    config.meetWith = dataflow::bvUnion;
     config.top = dataflow::zerosVector(maps.bitMap->size());
     config.boundaryState = dataflow::zerosVector(maps.bitMap->size());
 
