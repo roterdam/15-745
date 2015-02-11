@@ -5,8 +5,8 @@ namespace llvm {
   // The Expression class is provided here to help
   // you work with the expressions we'll be concerned
   // about for the Available Expression analysis
-  Expression::Expression (Instruction * I) {
-    if (BinaryOperator * BO = dyn_cast<BinaryOperator>(I)) {
+  Expression::Expression (const Instruction * I) {
+    if (const BinaryOperator * BO = dyn_cast<const BinaryOperator>(I)) {
       this->v1 = BO->getOperand(0);
       this->v2 = BO->getOperand(1);
       this->op = BO->getOpcode();

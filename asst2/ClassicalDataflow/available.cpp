@@ -60,7 +60,7 @@ class AvailExpTFBuilder : public dataflow::TransferFunctionBuilder {
     public:
      ~AvailExpTFBuilder(){ }
      AvailExpTFBuilder(const DenseMap<Expression, int>& bitMap, 
-                       const DenseMap<Value *, std::set<Expression>>& varExpMap):
+                       const DenseMap<const Value *, std::set<Expression>>& varExpMap):
         _bitMap(bitMap), _varExpMap(varExpMap), _n(bitMap.size()) { }
 
      dataflow::TransferFunction *makeInstTransferFn(
@@ -70,7 +70,7 @@ class AvailExpTFBuilder : public dataflow::TransferFunctionBuilder {
         BitVector killBV(_n, false); 
        
         // Build genBV, only for binary operator expressions
-        if (BinaryOperator *BO = dyn_cast<const BinaryOperator>(I)){
+        if (const BinaryOperator *BO = dyn_cast<const BinaryOperator>(I)){
             Expression exp = Expression(BO);
             if (_bitMap.count(exp) != 0){ 
                 genBV.set(_bitMap.lookup(exp)); // Set that exp as being generated
@@ -97,10 +97,10 @@ class AvailExpTFBuilder : public dataflow::TransferFunctionBuilder {
         BitVector killBV(_n, false); 
        
         for (auto it = B->rbegin(), et = B->rend(); it != et; ++it){
-            Instruction *I = &(*it);
+            const Instruction *I = &(*it);
 
             // x = y op z
-            if (BinaryOperator *BO = dyn_cast<BinaryOperator>(I)){
+            if (const BinaryOperator *BO = dyn_cast<const BinaryOperator>(I)){
                 Expression exp = Expression(BO);  // y op z
                 if (_bitMap.count(exp) != 0){ 
                     const int i = _bitMap.lookup(exp);
@@ -110,7 +110,7 @@ class AvailExpTFBuilder : public dataflow::TransferFunctionBuilder {
                 }
             }
             
-            if (_varExpMap.count(I) != 0) {  
+            if (_varExpMap.count(I) != 0) {
                 std::set<Expression> expsKilled = _varExpMap.lookup(I);   // Expressions containing x
                 for (auto it = expsKilled.begin(); it != expsKilled.end(); ++it){
                     Expression exp = *it;
@@ -127,7 +127,7 @@ class AvailExpTFBuilder : public dataflow::TransferFunctionBuilder {
     private:
         const DenseMap<Expression, int>& _bitMap;
         int _n;
-        const DenseMap<Value *, std::set<Expression>>& _varExpMap;
+        const DenseMap<const Value *, std::set<Expression>>& _varExpMap;
 };
 
 

@@ -13,10 +13,10 @@ namespace llvm {
 
   class Expression {
   public:
-    Value * v1;
-    Value * v2;
+    Value *v1;
+    Value *v2;
     Instruction::BinaryOps op;
-    Expression (Instruction * I);
+    Expression (const Instruction * I);
     bool operator== (const Expression &e2) const;
     bool operator< (const Expression &e2) const;
     std::string toString() const;
