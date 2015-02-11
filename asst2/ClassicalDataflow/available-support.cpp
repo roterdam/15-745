@@ -1,6 +1,10 @@
 #include "available-support.h"
 
-namespace llvm {  
+namespace llvm {
+
+  Expression::Expression() {
+    v1 = v2 = nullptr;
+  }
 
   // The Expression class is provided here to help
   // you work with the expressions we'll be concerned

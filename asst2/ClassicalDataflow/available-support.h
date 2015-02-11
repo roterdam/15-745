@@ -16,6 +16,7 @@ namespace llvm {
     Value *v1;
     Value *v2;
     Instruction::BinaryOps op;
+    Expression ();
     Expression (const Instruction * I);
     bool operator== (const Expression &e2) const;
     bool operator< (const Expression &e2) const;

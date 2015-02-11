@@ -19,9 +19,9 @@ namespace {
 
 struct TranslationMaps {
   // Expression to bit vector index
-  DenseMap<const Expression, int> *bitMap;  
+  map<Expression, int> *bitMap;  
   // Bit vector index to expression
-  DenseMap<int, const Expression> *expMap;  
+  DenseMap<int, Expression> *expMap;  
   // Value to set of expressions using that value
   DenseMap<const Value *, std::set<Expression>> *varExpMap;  
 };
@@ -59,7 +59,7 @@ class AvailExpTFBuilder : public dataflow::TransferFunctionBuilder {
 
     public:
      ~AvailExpTFBuilder(){ }
-     AvailExpTFBuilder(const DenseMap<Expression, int>& bitMap, 
+     AvailExpTFBuilder(const map<Expression, int>& bitMap, 
                        const DenseMap<const Value *, std::set<Expression>>& varExpMap):
         _bitMap(bitMap), _varExpMap(varExpMap), _n(bitMap.size()) { }
 
@@ -73,7 +73,7 @@ class AvailExpTFBuilder : public dataflow::TransferFunctionBuilder {
         if (const BinaryOperator *BO = dyn_cast<const BinaryOperator>(I)){
             Expression exp = Expression(BO);
             if (_bitMap.count(exp) != 0){ 
-                genBV.set(_bitMap.lookup(exp)); // Set that exp as being generated
+                genBV.set((*(_bitMap.find(exp))).second); // Set that exp as being generated
             }
         }
 
@@ -83,7 +83,7 @@ class AvailExpTFBuilder : public dataflow::TransferFunctionBuilder {
             for (auto it = expsKilled.begin(); it != expsKilled.end(); ++it){
                 Expression exp = *it;
                 if (_bitMap.count(exp) != 0){ // Expression is in bit vector
-                    killBV.set(_bitMap.lookup(exp));
+                    killBV.set((*(_bitMap.find(exp))).second);
                 }
             }
         }
@@ -103,7 +103,7 @@ class AvailExpTFBuilder : public dataflow::TransferFunctionBuilder {
             if (const BinaryOperator *BO = dyn_cast<const BinaryOperator>(I)){
                 Expression exp = Expression(BO);  // y op z
                 if (_bitMap.count(exp) != 0){ 
-                    const int i = _bitMap.lookup(exp);
+                    const int i = (*(_bitMap.find(exp))).second;
                     genBV.set(i);   // y op z is generated
                     killBV.reset(i);// Since y op z is generated, it is no longer killed 
                                     // since it has been recomputed
@@ -112,10 +112,9 @@ class AvailExpTFBuilder : public dataflow::TransferFunctionBuilder {
             
             if (_varExpMap.count(I) != 0) {
                 std::set<Expression> expsKilled = _varExpMap.lookup(I);   // Expressions containing x
-                for (auto it = expsKilled.begin(); it != expsKilled.end(); ++it){
-                    Expression exp = *it;
+                for (const Expression& exp : expsKilled) {
                     if (_bitMap.count(exp) != 0){ 
-                        killBV.set(_bitMap.lookup(exp));
+                        killBV.set((*(_bitMap.find(exp))).second);
                     }
                 }
             }
@@ -125,7 +124,7 @@ class AvailExpTFBuilder : public dataflow::TransferFunctionBuilder {
      }
 
     private:
-        const DenseMap<Expression, int>& _bitMap;
+        const map<Expression, int>& _bitMap;
         int _n;
         const DenseMap<const Value *, std::set<Expression>>& _varExpMap;
 };
@@ -142,12 +141,10 @@ class AvailableExpressions : public FunctionPass {
     vector<Expression> getExpsUsedInFunction(const Function& F){
 
         vector<Expression> expressions;
-        for (Function::iterator FI = F.begin(), FE = F.end(); FI != FE; ++FI) {
-           BasicBlock* block = FI;      
-           for (BasicBlock::iterator i = block->begin(), e = block->end(); i!=e; ++i) {
-               Instruction * I = i;
+        for (const BasicBlock& B : F) {
+            for (const Instruction& I : B) {
                // We only care about available expressions for BinaryOperators
-               if (BinaryOperator * BI = dyn_cast<BinaryOperator>(I)) {
+               if (const BinaryOperator *BI = dyn_cast<const BinaryOperator>(&I)) {
                    expressions.push_back(Expression(BI));
                }
            }	  
@@ -164,8 +161,8 @@ class AvailableExpressions : public FunctionPass {
 
     TranslationMaps getOperandMaps(Function& F){
         
-        DenseMap<const Expression, int> *bitMap = new DenseMap<const Expression, int>;
-        DenseMap<int, const Expression> *expMap = new DenseMap<int, const Expression>;
+        map<Expression, int> *bitMap = new map<Expression, int>;
+        DenseMap<int, Expression> *expMap = new DenseMap<int, Expression>;
         DenseMap<const Value *, std::set<Expression>> *varExpMap = 
                 new DenseMap<const Value *, std::set<Expression>>;
                                                                         
@@ -204,10 +201,10 @@ class AvailableExpressions : public FunctionPass {
          * 4. Print the data map
          */
         TranslationMaps maps = getOperandMaps(F);
-        const DenseMap<const Expression, int> *bitMap = maps.bitMap;
-        const DenseMap<int, const Expression> *expMap = maps.expMap;
+        const map<Expression, int> *bitMap = maps.bitMap;
+        const DenseMap<int, Expression> *expMap = maps.expMap;
         const DenseMap<const Value *, std::set<Expression>> *varExpMap = maps.varExpMap;
-        
+     
         dataflow::DataflowConfiguration config;
         config.dir = dataflow::FlowDirection::FORWARD;
         config.fnBuilder = new AvailExpTFBuilder(*bitMap, *varExpMap);
