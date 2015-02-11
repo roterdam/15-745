@@ -5,45 +5,44 @@
 #ifndef __CLASSICAL_DATAFLOW_DATAFLOW_H__
 #define __CLASSICAL_DATAFLOW_DATAFLOW_H__
 
-// Some useful libraries. Change as you see fit
-#include <stdio.h>
-#include <iostream>
-#include <queue>
-#include <type_traits>
-#include <vector>
 #include "llvm/IR/Instructions.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/IR/ValueMap.h"
 #include "llvm/IR/CFG.h"
 
 namespace llvm {
 namespace dataflow {
 
-// To get type-safety, transfer functions are required to subclass this
-// interface. Their class definitions will look like:
-// class MyTF : public TransferFunction<MyTF> {
-//  public:
-//    MyTF(const Instruction *inst) {
-//      ...
-//    }
-//    ...
-// };
-template<typename TFunc>
+// Transfer functions are required to subclass this interface.
 class TransferFunction {
  public:
   ~TransferFunction() { }
-  // "t1.thenCall(t2)(b)" should be equivalent to "t2(t1(b))", aka it's function
-  // composition with arguments in reverse order.
-  virtual TFunc& thenCall(const TFunc& t) = 0;
-  // t1(b) is allowed to modify and return its input argument b.
+  // Is allowed to modify and return the input vector.
   virtual BitVector& operator()(BitVector&) const = 0;
 };
 
-enum class FlowDirection { FORWARD, BACKWARD };
+// An interface for transfer function factories.
+class TransferFunctionBuilder {
+ public:
+  ~TransferFunctionBuilder() { }
+  virtual TransferFunction *makeInstTransferFn(const Instruction *) const = 0;
+  // Should be equivalent to composing the transfer functions for all the
+  // instructions in the block.
+  virtual TransferFunction *makeBlockTransferFn(const BasicBlock *) const = 0;
+};
 
-// The meet funciton is expected to modify and return its first argument.
+// Is allowed to modify and return its first argument.
 typedef BitVector& (*MeetFunction)(BitVector&, const BitVector&);
+enum FlowDirection { FORWARD, BACKWARD };
+
+// The input parameters to dataflow() that vary from problem to problem.
+struct DataflowConfiguration {
+  FlowDirection dir;
+  TransferFunctionBuilder *fnBuilder;
+  MeetFunction meetWith;
+  BitVector top;
+  BitVector boundaryState;
+};
 
 // The output of the dataflow program. "all program points" is implemented as a
 // map from instructions to the value at the corresponding program point, plus a
@@ -52,32 +51,18 @@ typedef BitVector& (*MeetFunction)(BitVector&, const BitVector&);
 // e.g. For forwards dataflow, map[inst] is the value just before inst, and
 //      map[boundary_point] is the value at the very end of the program.
 //      For backwards dataflow, this is reversed.
-typedef DenseMap<Instruction *, BitVector *> DataMap;
+typedef DenseMap<const Instruction *, BitVector> DataMap;
 static const Instruction *boundary_point = nullptr;
 
-// A collection of all the problem-specific arguments.
-template<typename TFunc>
-struct DataflowParameters {
-  static_assert(std::is_constructible<TFunc, const Instruction *>::value,
-                "TFunc should have a (const Instruction *) constructor");
-  static_assert(std::is_base_of<TransferFunction<TFunc>, TFunc>::value,
-                "TFunc should implement \"TransferFunction<TFunc>\"");
 
-  FlowDirection dir;
-  MeetFunction meetWith;
-  BitVector top;
-  BitVector boundary_state;
-};
-
-
-template<typename TFunc>
-DataMap *dataflow(const Function& code,
-                  const DataflowParameters<TFunc>& configParams) {
-  // Our implementation of Dataflow goes here.
-
-  // NOTE: in here, transfer functions can be created with "new TFunc(instPtr)".
-  return new DataMap();
-}
+// Dataflow functions
+DataMap *dataflow(const Function& F, const DataflowConfiguration& config);
+void printDataMap(const Function& F, const DataMap& dataMap,
+                  const FlowDirection dir, void (*printBV)(const BitVector&));
+const BitVector onesVector(const unsigned int n);
+const BitVector zerosVector(const unsigned int n);
+BitVector& bvIntersect(BitVector& v1, const BitVector& v2);
+BitVector& bvUnion(BitVector& v1, const BitVector& v2);
 
 } // namespace dataflow
 } // namespace llvm
