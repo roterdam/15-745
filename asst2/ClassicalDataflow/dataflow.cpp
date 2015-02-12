@@ -138,56 +138,27 @@ DataMap *traverseBackwards(const Function& F, BlockStateMap& blockStates,
         const BasicBlock *b = work_queue.front();
         work_queue.pop();
         b->printAsOperand(outs());
-        outs() << ":\n";
        
         // Meet in[s] for all successors s of b, and store in out[b].
         BitVector newOut = config.top; 
         for (auto it = succ_begin(b), et = succ_end(b); it != et; ++it) {
             newOut = config.meetWith(newOut, blockStates[*it].in);
-            outs() << "  ";
             (*it)->printAsOperand(outs());
-            outs() << "\n";
         }
         blockStates[b].out = newOut;
 
         // Set in[b] = f(out[b]).
         BitVector oldIn = blockStates[b].in;
-        BitVector newIn = newOut;
-        newIn = (*(config.fnBuilder->makeBlockTransferFn(b)))(newIn);
+        BitVector newIn = (*(config.fnBuilder->makeBlockTransferFn(b)))(newOut);
         blockStates[b].in = newIn;
-        printBitVector(newOut);
-        outs() << "\n";
-        printBitVector(oldIn);
-        outs() << "\n";
-        printBitVector(newIn);
-        outs() << "\n";
-
 
         // If in[b] changed, add all predecessors of b to the work queue.
         if (newIn != oldIn){
-            outs() << "different!\n";
             for (auto it = pred_begin(b), et = pred_end(b); it != et; ++it) {
                 work_queue.push(*it);
-                outs() << "  ";
-                (*it)->printAsOperand(outs());
-                outs() << "\n";
             }
         }
     }
-
-    outs() << "----------------\n";
-    for (auto it = blockStates.begin(), et = blockStates.end(); it != et; ++it){
-      const BasicBlock *block = (*it).first;
-      BlockState state = (*it).second;
-      block->printAsOperand(outs());
-      outs() << ":\n";
-      outs() << "in: ";
-      printBitVector(state.in);
-      outs() << "\nout: ";
-      printBitVector(state.out);
-      outs() << "\n";
-    }
-    outs() << "----------------\n";
 
     // Loop through the blocks to get a solution at every program point.
     DataMap *d = new DataMap();
@@ -202,6 +173,7 @@ DataMap *traverseBackwards(const Function& F, BlockStateMap& blockStates,
       }
     }
     (*d)[boundary_point] = blockStates[&(F.back())].out;
+
     return d;
 }
 
@@ -209,9 +181,13 @@ DataMap *traverseBackwards(const Function& F, BlockStateMap& blockStates,
 // TODO: try the reverse postorder iterator from piazza.
 DataMap *traverseForwards(const Function& F, BlockStateMap& blockStates,
                           const DataflowConfiguration& config) {
+
     // Find a solution for the start of all the blocks.
     std::queue<const BasicBlock *>work_queue; 
-    work_queue.push(&F.front());
+    // TODO: explore the blocks in a better order.
+    for (auto it = F.begin(), et = F.end(); it != et; ++it) {
+        work_queue.push(&*it);
+    } 
 
     while (!work_queue.empty()) {
         const BasicBlock *b = work_queue.front();
@@ -224,8 +200,9 @@ DataMap *traverseForwards(const Function& F, BlockStateMap& blockStates,
         }
         blockStates[b].in = newIn;
 
-        // Set out[b] = f(in[b]).
+        // oldOut = out[b];
         BitVector oldOut = blockStates[b].out;
+        // Set out[b] = f(in[b]).
         BitVector newOut = (*(config.fnBuilder->makeBlockTransferFn(b)))(newIn);
         blockStates[b].out = newOut;
 
@@ -239,6 +216,20 @@ DataMap *traverseForwards(const Function& F, BlockStateMap& blockStates,
 
     // Loop through the blocks to get a solution at every program point.
     DataMap *d = new DataMap();
+    for (const BasicBlock& B : F) {
+      BitVector bv = blockStates[&B].out;
+      
+      // We loop forward since this is forward analysis
+      for (auto it = B.begin(), et = B.end(); it != et; ++it) {
+        const Instruction *I = &*it;
+        if (!isa<PHINode>(I)) {
+          bv = (*(config.fnBuilder->makeInstTransferFn(I)))(bv);
+          (*d)[I] = bv;
+        }
+      }
+    }
+    (*d)[boundary_point] = blockStates[&(F.back())].out;
+
     return d;
 }
 

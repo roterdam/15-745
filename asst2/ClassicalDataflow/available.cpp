@@ -95,8 +95,8 @@ class AvailExpTFBuilder : public dataflow::TransferFunctionBuilder {
                     const BasicBlock *B) const {
         BitVector genBV(_n, false); 
         BitVector killBV(_n, false); 
-       
-        for (auto it = B->rbegin(), et = B->rend(); it != et; ++it){
+      
+        for (auto it = B->begin(), et = B->end(); it != et; ++it){
             const Instruction *I = &(*it);
 
             // x = y op z
@@ -106,7 +106,7 @@ class AvailExpTFBuilder : public dataflow::TransferFunctionBuilder {
                     const int i = (*(_bitMap.find(exp))).second;
                     genBV.set(i);   // y op z is generated
                     killBV.reset(i);// Since y op z is generated, it is no longer killed 
-                                    // since it has been recomputed
+                                    // since it has been recomputed. 
                 }
             }
             
@@ -119,6 +119,12 @@ class AvailExpTFBuilder : public dataflow::TransferFunctionBuilder {
                 }
             }
         }
+        
+        B->printAsOperand(outs());
+        outs() << "\nGen BV: ";
+        printAvailExpSet(genBV);
+        outs() << "Kill BV: ";
+        printAvailExpSet(killBV);
 
         return new AvailExpTransferFunction(genBV, killBV);
      }
@@ -202,17 +208,24 @@ class AvailableExpressions : public FunctionPass {
          */
         TranslationMaps maps = getOperandMaps(F);
         const map<Expression, int> *bitMap = maps.bitMap;
+
+        for (auto it = bitMap->begin(), et = bitMap->end(); it != et; ++it){
+            outs() << it->first.toString() << " --> " << it->second << "\n";
+        }
+
+
         const DenseMap<int, Expression> *expMap = maps.expMap;
         const DenseMap<const Value *, std::set<Expression>> *varExpMap = maps.varExpMap;
-     
+
         dataflow::DataflowConfiguration config;
         config.dir = dataflow::FlowDirection::FORWARD;
         config.fnBuilder = new AvailExpTFBuilder(*bitMap, *varExpMap);
         config.meetWith = dataflow::bvIntersect;
-        config.top = dataflow::onesVector(bitMap->size());
-        config.boundaryState = dataflow::zerosVector(bitMap->size());
+        config.top = dataflow::onesVector(maps.bitMap->size());
+        config.boundaryState = dataflow::zerosVector(maps.bitMap->size());
 
         dataflow::DataMap *out = dataflow::dataflow(F, config); 
+
         dataflow::printDataMap(F, *out, config.dir, printAvailExpSet);
         outs() << "\n\n";
 
