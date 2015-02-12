@@ -95,10 +95,25 @@ class AvailExpTFBuilder : public dataflow::TransferFunctionBuilder {
         BitVector genBV(_n, false);
         BitVector killBV(_n, false);
 
-        for (const PHINode *phi : phis) {
-          Value *phiArg = phi->getIncomingValueForBlock(B);
-          //TODO: gen? kill?
+        for (const PHINode *phi : phis) { 
+            if (_bitMap.count(phi) != 0){
+                const int i = (*(_bitMap.find(phi))).second;
+                genBV.set(i);       
+                killBV.reset(i);
+            }
+             
+            Value *phiArg = phi->getIncomingValueForBlock(B);
+            if (_varExpMap.count(phiArg) != 0) {
+                std::set<Expression> expsKilled = _varExpMap.lookup(phiArg);   
+                for (const Expression& exp : expsKilled) {
+                    if (_bitMap.count(exp) != 0){ 
+                        killBV.set((*(_bitMap.find(exp))).second);
+                    }
+                }
+            }
         }
+
+        return new AvailExpTransferFunction(genBV, killBV);
     }
 
 
@@ -131,10 +146,6 @@ class AvailExpTFBuilder : public dataflow::TransferFunctionBuilder {
             }
         }
         
-        outs() << "GenBV: ";
-        printAvailExpSet(genBV);
-        outs() << "KillBV: ";
-        printAvailExpSet(killBV);
         return new AvailExpTransferFunction(genBV, killBV);
      }
 
@@ -144,7 +155,29 @@ class AvailExpTFBuilder : public dataflow::TransferFunctionBuilder {
         const DenseMap<const Value *, std::set<Expression>>& _varExpMap;
 };
 
+class AvailableExprBitVectorPrinter : public dataflow::BitVectorPrinter {
+    public:
+        AvailableExprBitVectorPrinter(const DenseMap<int, Expression>& expMap):
+            _expMap(expMap) { }
+    
+        void print(const BitVector& bv) const {
+            outs() << "{";
+            bool firstItem = true;
+            for (int i = 0; i < bv.size(); i++) {
+                if (bv.test(i)) {
+                    if (!firstItem) {
+                        outs() << ", ";
+                    }
+                    outs() << (_expMap.lookup(i)).toString();
+                    firstItem = false;
+                }
+            }
+            outs() << "}";
+        }
 
+    private:
+        const DenseMap<int, Expression>& _expMap;
+};
 
 class AvailableExpressions : public FunctionPass {
     
@@ -236,7 +269,8 @@ class AvailableExpressions : public FunctionPass {
 
         dataflow::DataMap *out = dataflow::dataflow(F, config); 
 
-        // dataflow::printDataMap(F, *out, config.dir, printAvailExpSet);
+        const dataflow::BitVectorPrinter *printer = new AvailableExprBitVectorPrinter(*expMap);
+        dataflow::printDataMap(F, *out, config.dir, printer);
         outs() << "\n\n";
 
         delete bitMap;
@@ -244,6 +278,7 @@ class AvailableExpressions : public FunctionPass {
         delete varExpMap;
 
         delete config.fnBuilder;
+        delete printer;
         delete out;
 
         // Did not modify the incoming Function.

@@ -262,7 +262,7 @@ DataMap *traverseForwards(const Function& F, BlockStateMap& blockStates,
     // Loop through the blocks to get a solution at every program point.
     DataMap *d = new DataMap();
     for (const BasicBlock& B : F) {
-        BitVector bv = blockStates[&B].out;
+        BitVector bv = blockStates[&B].in;
       
         // We loop forward since this is forward analysis
         for (auto it = B.begin(), et = B.end(); it != et; ++it) {
@@ -273,7 +273,7 @@ DataMap *traverseForwards(const Function& F, BlockStateMap& blockStates,
             }
         }
     }
-    (*d)[boundary_point] = blockStates[&(F.back())].out;
+    (*d)[boundary_point] = blockStates[&(F.back())].in;
 
     return d;
 }
