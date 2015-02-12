@@ -10,6 +10,10 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/IR/CFG.h"
 
+#include <vector>
+
+using std::vector;
+
 namespace llvm {
 namespace dataflow {
 
@@ -25,10 +29,16 @@ class TransferFunction {
 class TransferFunctionBuilder {
  public:
   ~TransferFunctionBuilder() { }
+  // Will be called on non-PHI instructions.
   virtual TransferFunction *makeInstTransferFn(const Instruction *) const = 0;
-  // Should be equivalent to composing the transfer functions for all the
-  // instructions in the block.
-  virtual TransferFunction *makeBlockTransferFn(const BasicBlock *) const = 0;
+  // Will be called on PHI instructions, specialized once for each block the phi
+  // instruction references.
+  virtual TransferFunction *makePhiSeqTransferFn(const vector<const PHINode *>&,
+                                                 const BasicBlock *) const = 0;
+  // Should be equivalent to composing all the instructions in the given list.
+  // Note that phi nodes are disallowed, just as in makeInstTransferFn.
+  virtual TransferFunction *makeInstSeqTransferFn(
+    const vector<const Instruction*>&) const = 0;
 };
 
 // Is allowed to modify and return its first argument.
