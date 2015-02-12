@@ -51,6 +51,38 @@
 
 \newcommand{\code}[1]{\texttt{#1}}
 \begin{question}{Writeup}
+We have designed our framework such that in order to implement a dataflow pass,
+one would need to provide all of the configurations specified in \texttt{struct
+DataflowConfiguration} to the function \texttt{dataflow}.
+\begin{enumerate}
+\item \texttt{dir} is one of the \texttt{dataflow::FlowDirection} enums that
+needs to specify the direction of the analysis
+\item \texttt{top} and \texttt{boundaryState} are represented as
+\texttt{bitVectors}. As such, the client who is using this interface will need 
+to represent their domain as a bitvector and maintain the translation from the 
+domain to the bitvector.
+\item \texttt{meetFunction} can therefore be specified by one of
+\texttt{bvIntersect} or \texttt{bvUnion} which has also be exported in
+dataflow.h
+\item The \texttt{transferFunctionBuilder} is a class specifies the transfer
+function for the flow diagram. We specify 3 different kinds of transfer
+functions in this builder. \texttt{makeInstTransferFn} is a transfer function on
+a per instruction basis. \texttt{makeInstSeqTransferFn} is a transfer function
+on a basic block level. Most often, the latter is just a composition of
+\texttt{makeInstTransferFn}s but it is the client's responsibility to make sure
+that the transfer functions are composed in the right order, depending on
+\texttt{dir}. \\
+We also have a third transfer function for phi nodes.
+We do not treat phi functions to be part of any basic block and
+instead, handle them at the same time as the meet operator. This is because, at
+this time, we can specialize the phi instruction with information about the
+block's predecessors or successors. This last transfer function is therefore 
+\texttt{makePhiSeqTransferFn}.
+\end{enumerate}
+
+A reference implementation on how to use this framework can be seen in
+\texttt{available.cpp} or \texttt{liveness.cpp}
+
 \end{question}
 \begin{question}{Lazy Code Motion}
 
