@@ -9,6 +9,7 @@
 #include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "available-support.h"
 #include "dataflow.h"
 
 using namespace llvm;
@@ -111,6 +112,31 @@ class LivenessTFBuilder : public dataflow::TransferFunctionBuilder {
   const int _n;
 };
 
+class LivenessBitVectorPrinter : public dataflow::BitVectorPrinter {
+ public:
+  LivenessBitVectorPrinter(const DenseMap<int, const Value *>& valMap) :
+    _valMap(valMap) { }
+
+  void print(const BitVector& bv) const {
+    outs() << "{";
+    bool firstItem = true;
+    for (int i = 0; i < bv.size(); i++) {
+      if (bv.test(i)) {
+        if (!firstItem) {
+          outs() << ", ";
+        }
+        outs() << getShortValueName(_valMap.lookup(i));
+        firstItem = false;
+      }
+    }
+    outs() << "}";
+  }
+
+ private:
+  const DenseMap<int, const Value *>& _valMap;
+};
+
+
 
 class Liveness : public FunctionPass {
  public:
@@ -132,12 +158,14 @@ class Liveness : public FunctionPass {
 
     dataflow::DataMap *out = dataflow::dataflow(F, config);
 
-    dataflow::printDataMap(F, *out, config.dir, printLiveSet);
+    const dataflow::BitVectorPrinter *printer = new LivenessBitVectorPrinter(*valMap);
+    dataflow::printDataMap(F, *out, config.dir, printer);
     outs() << "\n\n";
 
     delete bitMap;
     delete valMap;
     delete config.fnBuilder;
+    delete printer;
     delete out;
 
     return false;

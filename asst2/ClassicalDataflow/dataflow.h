@@ -41,6 +41,13 @@ class TransferFunctionBuilder {
     const vector<const Instruction*>&) const = 0;
 };
 
+// Interface used in the printDataMap function.
+class BitVectorPrinter {
+ public:
+  ~BitVectorPrinter() { }
+  virtual void print(const BitVector&) const = 0;
+};
+
 // Is allowed to modify and return its first argument.
 typedef BitVector& (*MeetFunction)(BitVector&, const BitVector&);
 enum FlowDirection { FORWARD, BACKWARD };
@@ -68,7 +75,7 @@ static const Instruction *boundary_point = nullptr;
 // Dataflow functions
 DataMap *dataflow(const Function& F, const DataflowConfiguration& config);
 void printDataMap(const Function& F, const DataMap& dataMap,
-                  const FlowDirection dir, void (*printBV)(const BitVector&));
+                  const FlowDirection dir, const BitVectorPrinter *printer);
 const BitVector onesVector(const unsigned int n);
 const BitVector zerosVector(const unsigned int n);
 BitVector& bvIntersect(BitVector& v1, const BitVector& v2);

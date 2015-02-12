@@ -100,11 +100,11 @@ namespace llvm {
   // and let me know :) 
   // -Jonathan
 
-  std::string getShortValueName(Value * v) {    
+  std::string getShortValueName(const Value *v) {    
     if (v->getName().str().length() > 0) {
       return "%" + v->getName().str();
     }
-    else if (isa<Instruction>(v)) {
+    else if (isa<const Instruction>(v)) {
       std::string s = "";
       raw_string_ostream * strm = new raw_string_ostream(s);
       v->print(*strm);      
@@ -118,7 +118,7 @@ namespace llvm {
 	return "\"" + inst + "\"";
       }
     }
-    else if (ConstantInt * cint = dyn_cast<ConstantInt>(v)) {
+    else if (const ConstantInt * cint = dyn_cast<const ConstantInt>(v)) {
       std::string s = "";
       raw_string_ostream * strm = new raw_string_ostream(s);
       cint->getValue().print(*strm,true);      

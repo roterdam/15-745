@@ -42,14 +42,15 @@ DataMap *dataflow(const Function& F, const DataflowConfiguration& config) {
 }
 
 void printDataMap(const Function& F, const DataMap& dataMap,
-                  const FlowDirection dir, void (*printBV)(const BitVector&)) {
+                  const FlowDirection dir, const BitVectorPrinter *printer) {
   printFunctionSignature(F);
   for (const BasicBlock& B : F) {
     B.printAsOperand(outs());
     outs() << ":\n";
     if (dir == FORWARD && &B == F.begin()) {
       outs() << "--> ";
-      printBV(dataMap.lookup(boundary_point));
+      printer->print(dataMap.lookup(boundary_point));
+      outs() << "\n";
     }
     for (const Instruction& I : B) {
       if (dir == FORWARD) {
@@ -58,7 +59,8 @@ void printDataMap(const Function& F, const DataMap& dataMap,
       }
       if (!isa<PHINode>(&I)) {
         outs() << "--> ";
-        printBV(dataMap.lookup(&I));
+        printer->print(dataMap.lookup(&I));
+        outs() << "\n";
       }
       if (dir == BACKWARD) {
         I.print(outs());
@@ -68,7 +70,8 @@ void printDataMap(const Function& F, const DataMap& dataMap,
   }
   if (dir == BACKWARD) {
     outs() << "--> ";
-    printBV(dataMap.lookup(boundary_point));
+    printer->print(dataMap.lookup(boundary_point));
+    outs() << "\n";
   }
   outs() << "}\n";
 }

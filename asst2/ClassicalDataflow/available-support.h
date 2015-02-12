@@ -9,7 +9,7 @@
 
 
 namespace llvm {
-  std::string getShortValueName(Value * v);
+  std::string getShortValueName(const Value *v);
 
   class Expression {
   public:
