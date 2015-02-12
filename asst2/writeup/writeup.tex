@@ -71,6 +71,28 @@ After Lazy Code Motion and cleanup passes:
 \includegraphics[scale=0.5]{cfg3.jpg}
 \end{center}
 \end{question}
+\newpage
 \begin{question}{Loop Invariant Code Motion}
+The following lines are loop invariant instructions: $y = 5$, $m = y + 7$, $q =
+7$, $r = q + 9$. Since $y=5$ and $q=7$ are assignments to constants inside a
+loop, they are clearly loop invariant. $y=5$ is the only definition of $y$ that
+is reachable to the statement $m=y+7$ and therefore $m=y+7$ is loop invariant.
+The argument for $q$ is identical as well.
+\\
+\\ We need to satisfy 4 conditions in order to successfully move a statement to
+a preheader in the Loop Invariant Code motion Pass. I will now illustrate which
+of these statements can be moved and which can't using these requirements. $y=5$ 
+cannot be moved since $y$ is assigned to again in the loop. The statements 
+$m = y+7$ and $r = q+9$ cannot be moved to a preheader because they are in a 
+block that does not dominate all paths to exit. It is possible that the loop 
+exits in the very first conditional and therefore never gets around to executing 
+the basic block with lines $S9-S12$.
+\\
+\\The line $q = 7$ can be lifted since it is loop invariant, $q$ is never
+redefined, it is in the loop header and therefore, in this case, dominates all
+exits of the function as well as all uses of $q$ as well.
+\\
+\\It is worth noting that with a simple pass of constant propagation and folding, 
+we can achieve a much better outcome.
 \end{question}
 \end{document}
