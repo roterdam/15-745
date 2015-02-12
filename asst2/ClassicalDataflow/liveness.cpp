@@ -66,16 +66,31 @@ class LivenessTFBuilder : public dataflow::TransferFunctionBuilder {
   }
   
   LivenessTransferFunction *makePhiSeqTransferFn(const vector<const PHINode *>& phis,
-                                                 const BasicBlock *prevBlock) {
-    return nullptr;
-  }
-
-  dataflow::TransferFunction *makeBlockTransferFn(
-      const BasicBlock *b) const {
+                                                 const BasicBlock *prevBlock) const {
     BitVector killBV(_n, false);
     BitVector genBV(_n, false);
-    for (auto it = b->rbegin(), et = b->rend(); it != et; ++it) {
-      const Instruction *I = &*it;
+    for (auto it = phis.rbegin(), et = phis.rend(); it != et; ++it) {
+      const PHINode *I = *it;
+      if (_bitMap.count(I) != 0) {
+        const int i = _bitMap.lookup(I);
+        genBV.reset(i);
+        killBV.set(i);
+      }
+      Value *arg = I->getIncomingValueForBlock(prevBlock);
+      if (_bitMap.count(arg) != 0) {
+        const int i = _bitMap.lookup(arg);
+        genBV.set(i);
+      }
+    }
+    return new LivenessTransferFunction(killBV, genBV);
+  }
+
+  dataflow::TransferFunction *makeInstSeqTransferFn(
+      const vector<const Instruction *>& insts) const {
+    BitVector killBV(_n, false);
+    BitVector genBV(_n, false);
+    for (auto it = insts.rbegin(), et = insts.rend(); it != et; ++it) {
+      const Instruction *I = *it;
       if (_bitMap.count(I) != 0) {
         const int i = _bitMap.lookup(I);
         genBV.reset(i);

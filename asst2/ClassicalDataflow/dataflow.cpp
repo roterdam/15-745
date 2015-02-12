@@ -13,9 +13,10 @@ namespace dataflow {
 
 
 struct BlockState {
-  vector<const PHINode *> phis;
   BitVector in;
   BitVector out;
+  DenseMap<const BasicBlock *, TransferFunction *> phiTFs;
+  TransferFunction *blockTF;
 };
 typedef DenseMap<const BasicBlock *, BlockState> BlockStateMap;
 
@@ -122,6 +123,24 @@ void initializeBlockStates(const Function& F, BlockStateMap& blockStates,
         // Here we assume that there is a single exit block.
         blockStates[&(F.back())].out = config.boundaryState;
     }
+    const auto *builder = config.fnBuilder;
+    for (const BasicBlock& B : F) {
+      vector<const PHINode *> phis;
+      vector<const Instruction *> nonPhis;
+      for (const Instruction& I : B) {
+        const PHINode *phi = dyn_cast<const PHINode>(&I);
+        if (phi) {
+          phis.push_back(phi);
+        } else {
+          nonPhis.push_back(&I);
+        }
+      }
+      blockStates[&B].blockTF = builder->makeInstSeqTransferFn(nonPhis);
+      for (auto it = pred_begin(&B), et = pred_end(&B); it != et; ++it) {
+        const BasicBlock *P = *it;
+        blockStates[&B].phiTFs[P] = builder->makePhiSeqTransferFn(phis, P);
+      }
+    }
 }
 
 /*
@@ -145,14 +164,13 @@ DataMap *traverseBackwards(const Function& F, BlockStateMap& blockStates,
     while (!work_queue.empty()) {
         const BasicBlock *B = work_queue.front();
         work_queue.pop();
-       
+
         // Meet in[s] for all successors s of b, and store in out[b].
         BitVector newOut = config.top;
         for (auto it = succ_begin(B), et = succ_end(B); it != et; ++it) {
             const BasicBlock* S = *it;
             BitVector succBV = blockStates[S].in;
-            const vector<const PHINode *> ps = blockStates[S].phis;
-            succBV = (*(config.fnBuilder->makePhiSeqTransferFn(ps, B)))(succBV);
+            succBV = (*(blockStates[S].phiTFs[B]))(succBV);
             newOut = config.meetWith(newOut, succBV);
             // outs() << "  ";
             // (*it)->printAsOperand(outs());
@@ -163,8 +181,7 @@ DataMap *traverseBackwards(const Function& F, BlockStateMap& blockStates,
         // Set in[b] = f(out[b]).
         BitVector oldIn = blockStates[B].in;
         BitVector newIn = newOut;
-        newIn = (*(config.fnBuilder->makeBlockTransferFn(B)))(newIn);
-        blockStates[B].in = newIn;
+        blockStates[B].in = (*(blockStates[B].blockTF))(newIn);
         // printBitVector(newOut);
         // outs() << "\n";
         // printBitVector(oldIn);
@@ -236,7 +253,8 @@ DataMap *traverseForwards(const Function& F, BlockStateMap& blockStates,
 
         // Set out[b] = f(in[b]).
         BitVector oldOut = blockStates[b].out;
-        BitVector newOut = (*(config.fnBuilder->makeBlockTransferFn(b)))(newIn);
+        BitVector newOut = newIn;
+        newOut = (*(blockStates[b].blockTF))(newOut);
         blockStates[b].out = newOut;
 
         // If out[b] changed, add all succesors of b to the work queue.
