@@ -28,15 +28,6 @@ struct TranslationMaps {
 
 static TranslationMaps getOperandMaps(const Function&);
 static vector<const Expression> getExpsUsedInFunction(const Function&);
-static void printAvailExpSet(const BitVector&);
-
-void printAvailExpSet(const BitVector& bv){
-    outs() << "{";
-    for (int i = 0; i < bv.size(); i++) {
-        outs() << (bv[i] ? "1" : "0");
-    }
-    outs() << "}\n";
-}
 
 class AvailExpTransferFunction : public dataflow::TransferFunction {
 
@@ -96,13 +87,8 @@ class AvailExpTFBuilder : public dataflow::TransferFunctionBuilder {
         BitVector killBV(_n, false);
 
         for (const PHINode *phi : phis) { 
-            if (_bitMap.count(phi) != 0){
-                const int i = (*(_bitMap.find(phi))).second;
-                genBV.set(i);       
-                killBV.reset(i);
-            }
-             
             Value *phiArg = phi->getIncomingValueForBlock(B);
+            
             if (_varExpMap.count(phiArg) != 0) {
                 std::set<Expression> expsKilled = _varExpMap.lookup(phiArg);   
                 for (const Expression& exp : expsKilled) {
