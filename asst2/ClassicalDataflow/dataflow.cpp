@@ -177,8 +177,8 @@ DataMap *traverseBackwards(const Function& F, BlockStateMap& blockStates,
 
         // Set in[b] = f(out[b]).
         BitVector oldIn = blockStates[B].in;
-        BitVector newIn = newOut;
-        blockStates[B].in = (*(blockStates[B].blockTF))(newIn);
+        BitVector newIn = (*(blockStates[B].blockTF))(newOut);
+        blockStates[B].in = newIn;
 
         // If in[b] changed, add all predecessors of b to the work queue.
         if (newIn != oldIn){
@@ -201,44 +201,80 @@ DataMap *traverseBackwards(const Function& F, BlockStateMap& blockStates,
       }
     }
     (*d)[boundary_point] = blockStates[&(F.back())].out;
+
     return d;
 }
 
 
-// TODO: try the reverse postorder iterator from piazza.
 DataMap *traverseForwards(const Function& F, BlockStateMap& blockStates,
                           const DataflowConfiguration& config) {
-    // Find a solution for the start of all the blocks.
-    std::queue<const BasicBlock *>work_queue; 
-    work_queue.push(&F.front());
 
-    while (!work_queue.empty()) {
-        const BasicBlock *b = work_queue.front();
-        work_queue.pop();
+    // Find a solution for the start of all the blocks.
+    vector<const BasicBlock *>workList; 
+    for (auto it = F.begin(), et = F.end(); it != et; ++it) {
+        workList.push_back(&*it);
+    } 
+
+    while (!workList.empty()) {
+        const BasicBlock *b = workList.back();
+        workList.pop_back();
        
         // Meet out[p] for all predecessors p of b, and store in in[b].
         BitVector newIn = config.top;
         for (auto it = pred_begin(b), et = pred_end(b); it != et; ++it) {
-             newIn = config.meetWith(newIn, blockStates[*it].out);
+            const BasicBlock *P = *it;
+            BitVector predBV = blockStates[P].out;
+            predBV = (*(blockStates[b].phiTFs[P]))(predBV);
+            newIn = config.meetWith(newIn, blockStates[P].out);
+        }
+        if (pred_begin(b) == pred_end(b)) {
+            newIn = config.boundaryState;
         }
         blockStates[b].in = newIn;
 
-        // Set out[b] = f(in[b]).
+        // oldOut = out[b];
         BitVector oldOut = blockStates[b].out;
-        BitVector newOut = newIn;
-        newOut = (*(blockStates[b].blockTF))(newOut);
+        BitVector newOut = (*(blockStates[b].blockTF))(newIn);
         blockStates[b].out = newOut;
 
         // If out[b] changed, add all succesors of b to the work queue.
         if (newOut != oldOut) {
             for (auto it = succ_begin(b), et = succ_end(b); it != et; ++it) {
-                work_queue.push(*it);
+                workList.push_back(*it);
             }
         }
     }
 
+    outs() << "\n----------------\n";
+    for (auto it = blockStates.begin(), et = blockStates.end(); it != et; ++it){
+        const BasicBlock *block = (*it).first;
+        BlockState state = (*it).second;
+        block->printAsOperand(outs());
+        outs() << ":\n";
+        outs() << "in: ";
+        printBitVector(state.in);
+        outs() << "\nout: ";
+        printBitVector(state.out);
+        outs() << "\n";
+    }
+    outs() << "----------------\n";
+
     // Loop through the blocks to get a solution at every program point.
     DataMap *d = new DataMap();
+    for (const BasicBlock& B : F) {
+        BitVector bv = blockStates[&B].out;
+      
+        // We loop forward since this is forward analysis
+        for (auto it = B.begin(), et = B.end(); it != et; ++it) {
+            const Instruction *I = &*it;
+            if (!isa<PHINode>(I)) {
+                bv = (*(config.fnBuilder->makeInstTransferFn(I)))(bv);
+                (*d)[I] = bv;
+            }
+        }
+    }
+    (*d)[boundary_point] = blockStates[&(F.back())].out;
+
     return d;
 }
 
@@ -246,6 +282,7 @@ void printBitVector(const BitVector& bv) {
   for (int i = 0; i < bv.size(); i++) {
     outs() << (bv[i] ? "1" : "0"); 
   }
+  outs() << "\n";
 }
 
 
