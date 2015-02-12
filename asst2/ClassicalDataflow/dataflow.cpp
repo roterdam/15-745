@@ -118,13 +118,10 @@ void initializeBlockStates(const Function& F, BlockStateMap& blockStates,
         for (const BasicBlock& B : F) {
             blockStates[&B].out = config.top;
         }
-        blockStates[&(F.getEntryBlock())].in = config.boundaryState;
     } else {
         for (const BasicBlock& B : F) {
             blockStates[&B].in = config.top;
         }
-        // Here we assume that there is a single exit block.
-        blockStates[&(F.back())].out = config.boundaryState;
     }
     const auto *builder = config.fnBuilder;
     for (const BasicBlock& B : F) {
@@ -154,19 +151,16 @@ void initializeBlockStates(const Function& F, BlockStateMap& blockStates,
       corresponding edge in the control flow graph.
 */
 
-// TODO: try the backwards reverse postorder iterator from piazza.
 DataMap *traverseBackwards(const Function& F, BlockStateMap& blockStates,
                            const DataflowConfiguration& config) {
-    // Find a solution for the start of all the blocks.
-    std::queue<const BasicBlock *>work_queue;
-    // TODO: explore the blocks in a better order.
+    vector<const BasicBlock *>workList;
     for (auto it = F.begin(), et = F.end(); it != et; ++it) {
-      work_queue.push(&*it);
+      workList.push_back(&*it);
     } 
 
-    while (!work_queue.empty()) {
-        const BasicBlock *B = work_queue.front();
-        work_queue.pop();
+    while (!workList.empty()) {
+        const BasicBlock *B = workList.back();
+        workList.pop_back();
 
         // Meet in[s] for all successors s of b, and store in out[b].
         BitVector newOut = config.top;
@@ -175,9 +169,9 @@ DataMap *traverseBackwards(const Function& F, BlockStateMap& blockStates,
             BitVector succBV = blockStates[S].in;
             succBV = (*(blockStates[S].phiTFs[B]))(succBV);
             newOut = config.meetWith(newOut, succBV);
-            // outs() << "  ";
-            // (*it)->printAsOperand(outs());
-            // outs() << "\n";
+        }
+        if (succ_begin(B) == succ_end(B)) {
+          newOut = config.boundaryState;
         }
         blockStates[B].out = newOut;
 
@@ -185,39 +179,14 @@ DataMap *traverseBackwards(const Function& F, BlockStateMap& blockStates,
         BitVector oldIn = blockStates[B].in;
         BitVector newIn = newOut;
         blockStates[B].in = (*(blockStates[B].blockTF))(newIn);
-        // printBitVector(newOut);
-        // outs() << "\n";
-        // printBitVector(oldIn);
-        // outs() << "\n";
-        // printBitVector(newIn);
-        // outs() << "\n";
-
 
         // If in[b] changed, add all predecessors of b to the work queue.
         if (newIn != oldIn){
-            // outs() << "different!\n";
             for (auto it = pred_begin(B), et = pred_end(B); it != et; ++it) {
-                work_queue.push(*it);
-                // outs() << "  ";
-                // (*it)->printAsOperand(outs());
-                // outs() << "\n";
+                workList.push_back(*it);
             }
         }
     }
-
-    outs() << "----------------\n";
-    for (auto it = blockStates.begin(), et = blockStates.end(); it != et; ++it){
-      const BasicBlock *block = (*it).first;
-      BlockState state = (*it).second;
-      block->printAsOperand(outs());
-      outs() << ":\n";
-      outs() << "in: ";
-      printBitVector(state.in);
-      outs() << "\nout: ";
-      printBitVector(state.out);
-      outs() << "\n";
-    }
-    outs() << "----------------\n";
 
     // Loop through the blocks to get a solution at every program point.
     DataMap *d = new DataMap();
