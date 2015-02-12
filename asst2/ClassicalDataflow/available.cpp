@@ -28,7 +28,6 @@ struct TranslationMaps {
 
 static TranslationMaps getOperandMaps(const Function&);
 static vector<const Expression> getExpsUsedInFunction(const Function&);
-static bool isTracked(const Expression);
 static void printAvailExpSet(const BitVector&);
 
 void printAvailExpSet(const BitVector& bv){
@@ -46,9 +45,9 @@ class AvailExpTransferFunction : public dataflow::TransferFunction {
      AvailExpTransferFunction(const BitVector &genBV, const BitVector& killBV):
         _genBV(genBV), _killBV(killBV) { }
 
-     BitVector& operator()(BitVector& bv) const {
+     BitVector& operator()(BitVector& in) const {
         // out = gen union (in - kill)
-        return (bv.reset(_killBV)) |= _genBV;
+        return (in.reset(_killBV) |= _genBV);
      }
     private:
         const BitVector _genBV;
@@ -95,7 +94,8 @@ class AvailExpTFBuilder : public dataflow::TransferFunctionBuilder {
                     const BasicBlock *B) const {
         BitVector genBV(_n, false); 
         BitVector killBV(_n, false); 
-      
+
+        // Loop forward since this is a forward analysis
         for (auto it = B->begin(), et = B->end(); it != et; ++it){
             const Instruction *I = &(*it);
 
@@ -120,12 +120,10 @@ class AvailExpTFBuilder : public dataflow::TransferFunctionBuilder {
             }
         }
         
-        B->printAsOperand(outs());
-        outs() << "\nGen BV: ";
+        outs() << "GenBV: ";
         printAvailExpSet(genBV);
-        outs() << "Kill BV: ";
+        outs() << "KillBV: ";
         printAvailExpSet(killBV);
-
         return new AvailExpTransferFunction(genBV, killBV);
      }
 
@@ -213,6 +211,7 @@ class AvailableExpressions : public FunctionPass {
             outs() << it->first.toString() << " --> " << it->second << "\n";
         }
 
+        outs() << "\n\n";
 
         const DenseMap<int, Expression> *expMap = maps.expMap;
         const DenseMap<const Value *, std::set<Expression>> *varExpMap = maps.varExpMap;
@@ -226,7 +225,7 @@ class AvailableExpressions : public FunctionPass {
 
         dataflow::DataMap *out = dataflow::dataflow(F, config); 
 
-        dataflow::printDataMap(F, *out, config.dir, printAvailExpSet);
+        // dataflow::printDataMap(F, *out, config.dir, printAvailExpSet);
         outs() << "\n\n";
 
         delete bitMap;

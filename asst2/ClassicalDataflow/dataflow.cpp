@@ -195,15 +195,24 @@ DataMap *traverseForwards(const Function& F, BlockStateMap& blockStates,
        
         // Meet out[p] for all predecessors p of b, and store in in[b].
         BitVector newIn = config.top;
+        int count = 0;
         for (auto it = pred_begin(b), et = pred_end(b); it != et; ++it) {
              newIn = config.meetWith(newIn, blockStates[*it].out);
+             count++;
         }
-        blockStates[b].in = newIn;
+        if (count > 0) { // So that we don't reset it in case there is no predecessor
+            blockStates[b].in = newIn;
+        }
 
         // oldOut = out[b];
         BitVector oldOut = blockStates[b].out;
+
         // Set out[b] = f(in[b]).
-        BitVector newOut = (*(config.fnBuilder->makeBlockTransferFn(b)))(newIn);
+        outs() << "In BEFORE transfer function: ";
+        printBitVector(blockStates[b].in);
+        BitVector newOut = (*(config.fnBuilder->makeBlockTransferFn(b)))(blockStates[b].in);
+        outs() << "In AFTER transfer function: ";
+        printBitVector(blockStates[b].in);
         blockStates[b].out = newOut;
 
         // If out[b] changed, add all succesors of b to the work queue.
@@ -214,19 +223,33 @@ DataMap *traverseForwards(const Function& F, BlockStateMap& blockStates,
         }
     }
 
+    outs() << "\n----------------\n";
+    for (auto it = blockStates.begin(), et = blockStates.end(); it != et; ++it){
+        const BasicBlock *block = (*it).first;
+        BlockState state = (*it).second;
+        block->printAsOperand(outs());
+        outs() << ":\n";
+        outs() << "in: ";
+        printBitVector(state.in);
+        outs() << "\nout: ";
+        printBitVector(state.out);
+        outs() << "\n";
+    }
+    outs() << "----------------\n";
+
     // Loop through the blocks to get a solution at every program point.
     DataMap *d = new DataMap();
     for (const BasicBlock& B : F) {
-      BitVector bv = blockStates[&B].out;
+        BitVector bv = blockStates[&B].out;
       
-      // We loop forward since this is forward analysis
-      for (auto it = B.begin(), et = B.end(); it != et; ++it) {
-        const Instruction *I = &*it;
-        if (!isa<PHINode>(I)) {
-          bv = (*(config.fnBuilder->makeInstTransferFn(I)))(bv);
-          (*d)[I] = bv;
+        // We loop forward since this is forward analysis
+        for (auto it = B.begin(), et = B.end(); it != et; ++it) {
+            const Instruction *I = &*it;
+            if (!isa<PHINode>(I)) {
+                bv = (*(config.fnBuilder->makeInstTransferFn(I)))(bv);
+                (*d)[I] = bv;
+            }
         }
-      }
     }
     (*d)[boundary_point] = blockStates[&(F.back())].out;
 
@@ -237,6 +260,7 @@ void printBitVector(const BitVector& bv) {
   for (int i = 0; i < bv.size(); i++) {
     outs() << (bv[i] ? "1" : "0"); 
   }
+  outs() << "\n";
 }
 
 
