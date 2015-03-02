@@ -16,6 +16,7 @@ namespace llvm {
       this->op = BO->getOpcode();
     }
     else {
+      I->print(outs());
       errs() << "We're only considering BinaryOperators\n";
     }
   }
