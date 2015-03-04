@@ -23,24 +23,28 @@ using std::vector;
 using std::make_pair;
 using std::min;
 using std::pair;
+using std::swap;
 
 namespace {
-
 
 /*
   Because we have SSA, the algorithm from class can be simplified a little.
   The instructions we will move are all of the following:
   --> loop-invariant.
-  --> in a block that dominates all loop exits.
+  --> in a block that dominates all loop exits (NO LONGER NEEDED).
 */
 class LoopInvariantCodeMotion : public LoopPass {
  private:
   /*
     For every block B in L, prints the immediate dominator of B.
-    TODO: implement
   */
   static void printDominanceInformation(const Loop *L, const DTree& dTree) {
-    
+    outs() << "Loop contents:\n";
+    for (auto it = L->block_begin(), et = L->block_end(); it != et; ++it) {
+      BasicBlock *B = *it;
+      outs() << "  " << B->getName() << " <-- " << dTree.lookup(B)->getName()
+             << "\n";
+    }
   }
 
   /*
@@ -50,50 +54,62 @@ class LoopInvariantCodeMotion : public LoopPass {
         --> SafeToSpeculativelyExecute, doesn't touch memory, not a landing pad.
         --> not a PHI
         --> all operands are either loop-invariant, or not defined in the loop.
-    --> Must dominate all loop exits.
-    TODO: implement
+    --> Must dominate all loop exits. (UPDATE: we don't have to do this one)
+    NOTE: because of the structure of the algorithm, the returned instructions
+          are guaranteed to be in a valid order (i.e. a topological ordering
+          with respect to each other).
   */
   vector<Instruction *> getLiftableInstructions(const Loop *L,
                                                 const DTree& dTree) {
+    /* Get all instructions that could be moved out, if they were invariant. */
     vector<Instruction *> candidates;
     for (auto it = L->block_begin(), et = L->block_end(); it != et; ++it) {
-      BasicBlock& B = **it;
-      if (/* TODO: B dominates all exits */ true) {
-        for (Instruction& I : B) {
-          if (isSafeToSpeculativelyExecute(&I) &&
-              !I.mayReadFromMemory() &&
-              !isa<LandingPadInst>(&I) &&
-              !isa<PHINode>(&I)) {
-            candidates.push_back(&I);
-          }
+      for (Instruction& I : **it) {
+        if (isSafeToSpeculativelyExecute(&I) &&
+            !I.mayReadFromMemory() &&
+            !isa<LandingPadInst>(&I) &&
+            !isa<PHINode>(&I)) {
+          candidates.push_back(&I);
         }
       }
     }
 
-    vector<Instruction *> liftableInstructions;
+    /* Repeatedly loop over the candidates to extract invariant instructions. */
+    DenseSet<Instruction *> invariantExps;
+    unsigned int count = invariantExps.size();
     unsigned int oldCount;
     do {
-      oldCount = liftableInstructions.size();
-      for (Instruction *I : candidates) {
-        if (count(liftableInstructions.begin(), liftableInstructions.end(), I) == 0) {
-          liftableInstructions.push_back(I);
+      outs() << "start of iteration: count = " << count << "\n";
+      oldCount = count;
+      for (int i = count; i < candidates.size(); i++) {
+        bool allOperandsInvariant = true;
+        Instruction *I = candidates[i];
+        outs() << "  considering " << I->getName() << "...";
+        for (auto it = I->op_begin(), et = I->op_end(); it != et; ++it) {
+          Instruction *I2 = dyn_cast<Instruction>(it->get());
+          if (I2 != nullptr && L->contains(I2) && invariantExps.count(I2)==0) {
+            outs() << "NO because of " << I2->getName() << "\n";
+            allOperandsInvariant = false;
+            break;
+          }
         }
+        if (!allOperandsInvariant) {
+          continue;
+        }
+        outs() << "YES\n";
+        invariantExps.insert(I);
+        swap(candidates[i], candidates[count++]);
       }
-      /* Add loop-invariant instructions */
-    } while (liftableInstructions.size() != oldCount);
-
+      outs() << "end of iteration: count = " << count << "\n";
+    } while (count != oldCount);
+   
+ 
+    /* Return the result. */
+    vector<Instruction *>liftableInstructions(invariantExps.begin(),
+                                              invariantExps.end());
     outs() << "found " << liftableInstructions.size() << " liftable instructions\n";
 
     return liftableInstructions;
-  }
-
-  /*
-    Orders the instructions such that each instruction is before any
-    instructions that depend on it.
-    TODO: implement
-  */
-  void toposortInsts(vector<Instruction *>& insts) {
-
   }
 
  public:
@@ -110,7 +126,6 @@ class LoopInvariantCodeMotion : public LoopPass {
     printDominanceInformation(L, *dt);
 
     vector<Instruction *> loopInvariantInsts = getLiftableInstructions(L, *dt);
-    toposortInsts(loopInvariantInsts);
 
     for (Instruction *I : loopInvariantInsts) {
       I->moveBefore(preheader->getTerminator());

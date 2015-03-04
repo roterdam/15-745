@@ -138,4 +138,3 @@ void printDominanceTree(const DTree& dTree) {
            << " --> " << (p2 != nullptr ? p2->getName() : "NULL") << "\n";
   }
 }
-
