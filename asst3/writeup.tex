@@ -53,6 +53,27 @@
 
 \begin{question}{Implementation Notes}
 
+The loop-invariant code motion transformation works according to the following steps:
+\begin{enumerate}
+\item	Compute the nearest dominating ancestor of every block, using two instances of DFS.
+\item	Extract all candidate instructions from the loop, where a candidate instruction is all of the following:
+	\begin{itemize}
+	\item Safe to speculatively execute.
+	\item Not a memory read.
+	\item	Not a phi node.
+	\item	Not a landing pad instruction.
+	\end{itemize}
+\item Repeatedly loop through the list of candidates, extracting everything that is either not defined in the loop or only has loop-invariant operands. Stop when a pass through the candidates list generates no new instructions.
+\item Loop through the generated list, and move all of them to the loop preheater.
+\end{enumerate}
+Some important notes:
+\begin{itemize}
+\item	As per the piazza post, we do not guarantee to only move instructions that dominate all loop exits.
+\item	Because of the order in which we examined candidates, the instructions do not need to be topologically sorted before moving them to the preheater.
+\end{itemize}
+We evaluated performance by using the llvm interpreter instruction counter, as specified in the handout.
+
+
 \end{question}
 
 \newpage
