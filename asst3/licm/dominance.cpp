@@ -36,12 +36,6 @@ BackEdgeSet findBackEdges(Function& F) {
 
   visitBE(F.getEntryBlock(), seenSet, pathSet, backEdges);
   
-  outs() << "back edges are:\n";
-  for (pair<BasicBlock *, BasicBlock *> p : backEdges) {
-    outs() << "  " << p.first->getName() << " -> " << p.second->getName()
-           << "\n";
-  }
-
   return backEdges;
 }
 
@@ -49,19 +43,20 @@ BackEdgeSet findBackEdges(Function& F) {
 BasicBlock *findCommonLDA(const vector<BasicBlock *>& blocks,
                           const DTree *dTree) {
   int nBlocks = blocks.size();
-  
+
   if (nBlocks == 0) {
     return nullptr;
   }
   if (nBlocks == 1) {
     return blocks[0];
   }
-
+  
   vector<BasicBlock *> dLists[nBlocks];
   for (int i = 0; i < nBlocks; i++) {
     BasicBlock *B = blocks[i];
     do {
       dLists[i].push_back(B);
+      B = dTree->lookup(B);
     } while (B != nullptr);
     std::reverse(dLists[i].begin(), dLists[i].end());
   }
@@ -124,7 +119,6 @@ DTree *buildDominanceTree(Function& F) {
   for (BasicBlock& B : F) {
     computeLDA(B, backEdges, dTree);
   }
-
 
   return dTree;
 }

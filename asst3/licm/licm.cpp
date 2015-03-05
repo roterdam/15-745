@@ -76,19 +76,16 @@ class LoopInvariantCodeMotion : public LoopPass {
 
     /* Repeatedly loop over the candidates to extract invariant instructions. */
     DenseSet<Instruction *> invariantExps;
-    unsigned int count = invariantExps.size();
+    unsigned int count = 0;
     unsigned int oldCount;
     do {
-      outs() << "start of iteration: count = " << count << "\n";
       oldCount = count;
       for (int i = count; i < candidates.size(); i++) {
         bool allOperandsInvariant = true;
         Instruction *I = candidates[i];
-        outs() << "  considering " << I->getName() << "...";
         for (auto it = I->op_begin(), et = I->op_end(); it != et; ++it) {
           Instruction *I2 = dyn_cast<Instruction>(it->get());
           if (I2 != nullptr && L->contains(I2) && invariantExps.count(I2)==0) {
-            outs() << "NO because of " << I2->getName() << "\n";
             allOperandsInvariant = false;
             break;
           }
@@ -96,18 +93,14 @@ class LoopInvariantCodeMotion : public LoopPass {
         if (!allOperandsInvariant) {
           continue;
         }
-        outs() << "YES\n";
         invariantExps.insert(I);
         swap(candidates[i], candidates[count++]);
       }
-      outs() << "end of iteration: count = " << count << "\n";
     } while (count != oldCount);
-   
  
     /* Return the result. */
-    vector<Instruction *>liftableInstructions(invariantExps.begin(),
-                                              invariantExps.end());
-    outs() << "found " << liftableInstructions.size() << " liftable instructions\n";
+    vector<Instruction *>liftableInstructions(candidates.begin(),
+                                              candidates.begin() + count);
 
     return liftableInstructions;
   }
@@ -122,7 +115,6 @@ class LoopInvariantCodeMotion : public LoopPass {
       return false;
     }
     DTree *dt = buildDominanceTree(*(preheader->getParent()));
-    printDominanceTree(*dt);
     printDominanceInformation(L, *dt);
 
     vector<Instruction *> loopInvariantInsts = getLiftableInstructions(L, *dt);
