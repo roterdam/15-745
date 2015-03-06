@@ -245,20 +245,6 @@ DataMap *traverseForwards(const Function& F, BlockStateMap& blockStates,
         }
     }
 
-    outs() << "\n----------------\n";
-    for (auto it = blockStates.begin(), et = blockStates.end(); it != et; ++it){
-        const BasicBlock *block = (*it).first;
-        BlockState state = (*it).second;
-        block->printAsOperand(outs());
-        outs() << ":\n";
-        outs() << "in: ";
-        printBitVector(state.in);
-        outs() << "\nout: ";
-        printBitVector(state.out);
-        outs() << "\n";
-    }
-    outs() << "----------------\n";
-
     // Loop through the blocks to get a solution at every program point.
     DataMap *d = new DataMap();
     for (const BasicBlock& B : F) {
