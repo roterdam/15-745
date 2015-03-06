@@ -8,6 +8,8 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/IntrinsicInst.h"
+#include "llvm/Analysis/ValueTracking.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 
 #include "dataflow.h"
@@ -22,7 +24,6 @@ using std::vector;
 
 namespace {
 
-
 struct TranslationMaps {
   DenseMap<const Value *, int> *bitMap;
   DenseMap<int, const Value *> *valMap;
@@ -33,10 +34,10 @@ static vector<const Value *> getValuesUsedInFunction(const Function&);
 static bool isTracked(const Value *);
 
 /*********** liveness transfer functions ***********/
-class LivenessTransferFunction : public dataflow::TransferFunction {
+class FaintnessTransferFunction : public dataflow::TransferFunction {
  public:
-  ~LivenessTransferFunction() { }
-  LivenessTransferFunction(const BitVector& genBV, const BitVector& killBV) :
+  ~FaintnessTransferFunction() { }
+  FaintnessTransferFunction(const BitVector& genBV, const BitVector& killBV) :
     _genBV(genBV), _killBV(killBV) { }
 
   BitVector& operator()(BitVector& bv) const {
@@ -49,17 +50,24 @@ class LivenessTransferFunction : public dataflow::TransferFunction {
 };
 
 
-class LivenessTFBuilder : public dataflow::TransferFunctionBuilder {
+class FaintnessTFBuilder : public dataflow::TransferFunctionBuilder {
  private:
-  void processWrite(const Value *v, BitVector *genBV, BitVector *killBV) const {
+  int processLHS(const Value *v, BitVector *genBV, BitVector *killBV) const {
+
     if (_bitMap.count(v) != 0) {
       const int i = _bitMap.lookup(v);
-      genBV->reset(i);
-      killBV->set(i);
+      
+      // if (LHS value not in x) - the input value
+      if (genBV->test(i) == false){
+          genBV->set(i);
+          killBV->reset(i);
+          return 0;
+      }
     }
+    return -1;
   }
 
-  void processRead(const Value *v, BitVector *genBV, BitVector *killBV) const {
+  void processRHS(const Value *v, BitVector *genBV, BitVector *killBV) const {
     if (_bitMap.count(v) != 0) {
       genBV->set(_bitMap.lookup(v));
     }
@@ -67,40 +75,53 @@ class LivenessTFBuilder : public dataflow::TransferFunctionBuilder {
 
   void processInst(const Instruction *I, BitVector *genBV, BitVector *killBV)
       const {
-    processWrite(I, genBV, killBV);
-    for (auto it = I->op_begin(), et = I->op_end(); it != et; ++it) {
-      processRead((*it).get(), genBV, killBV);
+
+    if (isa<TerminatorInst>(I) || isa<DbgInfoIntrinsic>(I) || 
+        isa<LandingPadInst>(I) || I->mayHaveSideEffects()){
+        return;
+    }
+
+    /* 
+     *          (x U LHS) - RHS if LHS not in x
+     * f(x) = 
+     *          x otherwise
+     */
+    if (processLHS(I, genBV, killBV)){
+        for (auto it = I->op_begin(), et = I->op_end(); it != et; ++it) {
+          processRHS((*it).get(), genBV, killBV);
+        }
     }
   }
 
   void processPhi(const PHINode *phi, const BasicBlock *prevBlock,
                   BitVector *genBV, BitVector *killBV) const {
-    processWrite(phi, genBV, killBV);
-    processRead(phi->getIncomingValueForBlock(prevBlock), genBV, killBV);
+    if (processLHS(phi, genBV, killBV)) {
+        processRHS(phi->getIncomingValueForBlock(prevBlock), genBV, killBV);
+    }
   }
 
  public:
-  LivenessTFBuilder(const DenseMap<const Value *, int>& bitMap) :
+  FaintnessTFBuilder(const DenseMap<const Value *, int>& bitMap) :
     _bitMap(bitMap), _n(bitMap.size()) { }
-  ~LivenessTFBuilder() { }
+  ~FaintnessTFBuilder() { }
 
   dataflow::TransferFunction *makeInstTransferFn(
       const Instruction *inst) const {
     BitVector genBV(_n, false);
     BitVector killBV(_n, false);
     processInst(inst, &genBV, &killBV);
-    return new LivenessTransferFunction(genBV, killBV);
+    return new FaintnessTransferFunction(genBV, killBV);
   }
 
 
-  LivenessTransferFunction *makePhiSeqTransferFn(
+  FaintnessTransferFunction *makePhiSeqTransferFn(
       const vector<const PHINode *>& phis, const BasicBlock *prevBlock) const {
     BitVector genBV(_n, false);
     BitVector killBV(_n, false);
     for (auto it = phis.rbegin(), et = phis.rend(); it != et; ++it) {
       processPhi(*it, prevBlock, &genBV, &killBV);
     }
-    return new LivenessTransferFunction(genBV, killBV);
+    return new FaintnessTransferFunction(genBV, killBV);
   }
 
   dataflow::TransferFunction *makeInstSeqTransferFn(
@@ -110,7 +131,7 @@ class LivenessTFBuilder : public dataflow::TransferFunctionBuilder {
     for (auto it = insts.rbegin(), et = insts.rend(); it != et; ++it) {
       processInst(*it, &genBV, &killBV);
     }
-    return new LivenessTransferFunction(genBV, killBV);
+    return new FaintnessTransferFunction(genBV, killBV);
   }
 
  private:
@@ -178,9 +199,29 @@ bool isTracked(const Value *v) {
 }
 
 
-
-
-
+class FaintnessVarBitVectorPrinter : public dataflow::BitVectorPrinter {
+  public:
+      FaintnessVarBitVectorPrinter(const DenseMap<int, const Value *>& valMap):
+         _valMap(valMap) { } 
+        
+      void print(const BitVector& bv) const {
+        bool firstItem = true;
+        outs() << "{";
+        for (int i = 0; i < bv.size(); i++) {
+            if (bv.test(i)) {
+                if (!firstItem) {
+                    outs() << ", ";
+                } 
+                outs() << *(_valMap.lookup(i));
+                firstItem = false;
+            }
+        }
+        outs() << "}";
+      
+      }
+  private:
+    const DenseMap<int, const Value *>& _valMap; 
+};
 
 /********** dead code elimination pass **********/
 class DeadCodeElimination : public FunctionPass {
@@ -189,10 +230,10 @@ class DeadCodeElimination : public FunctionPass {
       const DenseMap<const Value *, int> *bitMap) {
     dataflow::DataflowConfiguration config;
     config.dir = dataflow::FlowDirection::BACKWARD;
-    config.fnBuilder = new LivenessTFBuilder(*bitMap);
-    config.meetWith = dataflow::bvUnion;
-    config.top = dataflow::zerosVector(bitMap->size());
-    config.boundaryState = dataflow::zerosVector(bitMap->size());
+    config.fnBuilder = new FaintnessTFBuilder(*bitMap);
+    config.meetWith = dataflow::bvIntersect;
+    config.top = dataflow::onesVector(bitMap->size());
+    config.boundaryState = dataflow::onesVector(bitMap->size());
     return config;
   }
 
@@ -209,22 +250,30 @@ class DeadCodeElimination : public FunctionPass {
     const dataflow::DataflowConfiguration config =
         makeDataflowConfiguration(F, bitMap);
     dataflow::DataMap *out = dataflow::dataflow(F, config);
-    
+
+    const dataflow::BitVectorPrinter *printer = new FaintnessVarBitVectorPrinter(*valMap);
+    dataflow::printDataMap(F, *out, config.dir, printer);
+    outs() << out->size() << "\n";
+
     /* Remove all non-live instructions here. */
+        
     
     delete bitMap;
     delete valMap;
     delete config.fnBuilder;
     delete out;
+    delete printer;
 
-    return false;
+
+    return true;
   }
+
 };
 
 
 // LLVM uses the address of this static member to identify the pass, so the
 // initialization value is unimportant.
 char DeadCodeElimination::ID = 0;
-RegisterPass<DeadCodeElimination> X("dce", "15745: dead code elimination");
+RegisterPass<DeadCodeElimination> X("deadcode", "15745: dead code elimination");
 
 }
