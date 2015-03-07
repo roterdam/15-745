@@ -92,8 +92,9 @@ completed successfully.
 \begin{tabular}{|c | c | c|}
 \hline
 Benchmark & Instructions exe before LICM & Instructions exe after LICM \\ \hline
-init2d.c & - & \\ \hline
-zmean.c & - & \\ \hline
+init2d.c & 9762016 & 7017516\\ \hline
+loop.c & 4013989 & 3011993\\ \hline
+zmean.c & 330006 & 310008\\ \hline
 \end{tabular}
 \end{center}
 
@@ -101,8 +102,8 @@ zmean.c & - & \\ \hline
 \begin{tabular}{|c | c | c|}
 \hline
 Benchmark & Instructions exe before DCE & Instructions exe after DCE \\ \hline
-bench1.c & 31 & \\ \hline
-bench2.c & 16030 & \\ \hline
+bench1.c & 70006 & 60006\\ \hline
+bench2.c & 90006 & 60006\\ \hline
 \end{tabular}
 \end{center}
 \end{question}
