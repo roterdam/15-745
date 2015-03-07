@@ -15,4 +15,3 @@ int main(int argc, char *argv[]){
     b = a - c;
     d = b + f;
     return 0;
-}

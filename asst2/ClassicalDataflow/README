@@ -1,0 +1,14 @@
+15-745 Project 2
+@rokhinip
+@mchoquet 
+
+Run the project as described in the handout
+
+To compile, use:
+$make
+
+To run the Liveness pass, use:
+$ opt -load ./liveness.so -liveness loop.bc -o live.out.bc
+
+To run the Available Expressions pass, use:
+$ opt -load ./available.so -available loop.bc -o avail.out.bc
