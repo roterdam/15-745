@@ -65,8 +65,8 @@ struct DataflowConfiguration {
 // map from instructions to the value at the corresponding program point, plus a
 // single special value that corresponds to the boundary condition program
 // point.
-// e.g. For forwards dataflow, map[inst] is the value just before inst, and
-//      map[boundary_point] is the value at the very end of the program.
+// e.g. For forwards dataflow, map[inst] is the value just after inst, and
+//      map[boundary_point] is the value at the very start of the program.
 //      For backwards dataflow, this is reversed.
 typedef DenseMap<const Instruction *, BitVector> DataMap;
 static const Instruction *boundary_point = nullptr;

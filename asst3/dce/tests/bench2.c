@@ -1,15 +1,15 @@
-int dcebench3(int a, int b) { 	
-	int c = 2 + b;
-	int w = 2 * c;
-	for(int i = 0; i < 1000; i++) { 
-		w = b + c;
-		c = c + i;
-	}
-	return c + a;
+int f(int n) {
+  int a, b, c, x;
+  a = b = c = x = 0;
+  for (int i = 0; i < n; i++) {
+    c += b;
+    b += a;
+    a += i;
+    x += i;
+  }
+  return x;
 }
-return c + a;
 
-int main(int argc, char const *argv[]) { 
-	dcebench3(2, 3);
-	return 0; 
+int main() {
+  return f(10000);
 }

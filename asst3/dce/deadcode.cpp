@@ -32,7 +32,6 @@ struct TranslationMaps {
 static TranslationMaps getTranslationMaps(const Function&);
 static vector<const Value *> getValuesUsedInFunction(const Function&);
 static bool isTracked(const Value *);
-static void printBitVector(const BitVector& bv);
 
 /*********** Faintness transfer functions ***********/
 
@@ -56,11 +55,6 @@ class FaintnessInstTransferFunction : public dataflow::TransferFunction {
 
     // Eg. function only returns 42;
     if (bv.size() == 0) return bv;
-
-    if (_bit_idx >= bv.size()){
-      printf("_bit_idx: %d, bv_size: %d\n", _bit_idx, bv.size());
-      exit(-1); 
-    }
 
     // Then all operands involved must be non-faint regardless of input value
     if (_non_faint_instr){
@@ -154,8 +148,6 @@ class FaintnessTFBuilder : public dataflow::TransferFunctionBuilder {
         inst->mayThrow()){
       non_faint_instr = true;
     }
-    inst->print(outs());
-    outs() << "\tnon_faint_instr: " << non_faint_instr << "\n";
     return new FaintnessInstTransferFunction(genBV, killBV, non_faint_instr, bit_idx);
   }
 
@@ -297,19 +289,34 @@ class DeadCodeElimination : public FunctionPass {
     vector<Instruction *> toDelete;
     for (auto it = inst_begin(F), et = inst_end(F); it != et; ++it) {
       Instruction *I = &*it;
-      if (isTracked(I) && faintMaps->lookup(I).test(bitMap->lookup(I))) {
+      if (!isTracked(I) || I->isTerminator()) {
+        continue;
+      }
+      BitVector bv;
+      /* Silly workaround because our framework doesn't handle program points
+       * super well. */
+      if (isa<PHINode>(I)) {
+        bv = faintMaps->lookup(I->getParent()->getFirstNonPHI());
+      } else {
+        bv = faintMaps->lookup(I->getNextNode());
+      }
+      if (bv.test(bitMap->lookup(I))) {
         toDelete.push_back(I);
       }
     }
 
-    outs() << "deleting the following " << toDelete.size() << " instructions\n";
+    outs() << "deleting the following " << toDelete.size() <<" instructions:\n";
     for (Instruction *I : toDelete) {
       I->print(outs());
       outs() << "\n";
     }
 
-    for (auto it = toDelete.rbegin(), et = toDelete.rend(); it != et; ++it) {
-      (*it)->eraseFromParent();
+    /* Do in two steps to remove cyclic dependencies. */
+    for (Instruction *I : toDelete) {
+      I->dropAllReferences();
+    }
+    for (Instruction *I : toDelete) {
+      I->eraseFromParent();
     }
 
     delete bitMap;

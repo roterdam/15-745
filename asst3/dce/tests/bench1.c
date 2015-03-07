@@ -1,10 +1,13 @@
-int deadvar(int a, int b) { 
-	int c = 2 + b;
-	int z = 2 * c; 
-	int x = z ­ 2; 
-	return c + a;
+int f(int n) {
+  int x = 0;
+  int y = 0;
+  for (int i = 0; i < n; i++) {
+    x += i;
+    y += i;
+  }
+  return x;
 }
-int main(int argc, char const *argv[]) { 
-	int a = deadvar(3, 4);
-	return a;
+
+int main() {
+  return f(10000);
 }

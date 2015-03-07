@@ -259,7 +259,7 @@ DataMap *traverseForwards(const Function& F, BlockStateMap& blockStates,
             }
         }
     }
-    (*d)[boundary_point] = blockStates[&(F.back())].out;
+    (*d)[boundary_point] = blockStates[&(F.getEntryBlock())].out;
 
     return d;
 }
