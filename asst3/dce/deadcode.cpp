@@ -148,8 +148,6 @@ class FaintnessTFBuilder : public dataflow::TransferFunctionBuilder {
     // Create the gen and kill set for this instr
     processInst(inst, &genBV, &killBV);
 
-    // TODO: In small.c, we are looking at a div operation but somehow, it doesn't get 
-    // categorized under mayHaveSideEffects or mayThrow. What?
     bool non_faint_instr = false;
     if (isa<TerminatorInst>(inst) || isa<DbgInfoIntrinsic>(inst) || 
         isa<LandingPadInst>(inst) || inst->mayHaveSideEffects() || 
@@ -267,30 +265,6 @@ bool isTracked(const Value *v) {
 }
 
 
-class FaintnessVarBitVectorPrinter : public dataflow::BitVectorPrinter {
-  public:
-      FaintnessVarBitVectorPrinter(const DenseMap<int, const Value *>& valMap):
-         _valMap(valMap) { } 
-        
-      void print(const BitVector& bv) const {
-        bool firstItem = true;
-        outs() << "{";
-        for (int i = 0; i < bv.size(); i++) {
-            if (bv.test(i)) {
-                if (!firstItem) {
-                    outs() << ", ";
-                } 
-                outs() << *(_valMap.lookup(i));
-                firstItem = false;
-            }
-        }
-        outs() << "}";
-      
-      }
-  private:
-    const DenseMap<int, const Value *>& _valMap; 
-};
-
 /********** dead code elimination pass **********/
 class DeadCodeElimination : public FunctionPass {
  private:
@@ -313,59 +287,40 @@ class DeadCodeElimination : public FunctionPass {
     TranslationMaps maps = getTranslationMaps(F);
     const DenseMap<const Value *, int> *bitMap = maps.bitMap;
     const DenseMap<int, const Value *> *valMap = maps.valMap;
-    
+   
+    /* Compute faint variables. */
     const dataflow::DataflowConfiguration config =
         makeDataflowConfiguration(F, bitMap);
-    dataflow::DataMap *out = dataflow::dataflow(F, config);
+    dataflow::DataMap *faintMaps = dataflow::dataflow(F, config);
 
-    const dataflow::BitVectorPrinter *printer = new FaintnessVarBitVectorPrinter(*valMap);
-    dataflow::printDataMap(F, *out, config.dir, printer);
-
-    /* Remove all faint instructions here. */
-    // If variable t is defined at line L and variable t is faint at line L+1, then it can be 
-    // safely eliminated 
-    bool modified = false;
-  
-    inst_iterator prev = inst_begin(F);
-    for (inst_iterator it = prev; it != inst_end(F); ++it){
-      Instruction *prevI = &*prev; 
-      if (prev != it && isTracked(prevI)) {
-        Instruction *currI = &*it;
-        BitVector bv = out->lookup(currI);  // Variables faint at line L+1
-
-        int bit_idx = bitMap->lookup(prevI); 
-        if (bv.test(bit_idx) == 1){        // Variable 
-          // Line L can be safely eliminated
-          
-          // TODO: eraseFromParent removes instruction and drops all references to it. 
-          // Yet somehow we are getting a use remains when def is gone error
-          outs() << "Erasing: \n";
-          prevI->print(outs());
-          outs() << "\n";
-          // Erase the definition of prev and all its uses
-          prev->eraseFromParent();
-          modified = true;
-        }
+    /* Remove all statements that define faint variables. */
+    vector<Instruction *> toDelete;
+    for (auto it = inst_begin(F), et = inst_end(F); it != et; ++it) {
+      Instruction *I = &*it;
+      if (isTracked(I) && faintMaps->lookup(I).test(bitMap->lookup(I))) {
+        toDelete.push_back(I);
       }
-      prev = it;
     }
-    
+
+    outs() << "deleting the following " << toDelete.size() << " instructions\n";
+    for (Instruction *I : toDelete) {
+      I->print(outs());
+      outs() << "\n";
+    }
+
+    for (auto it = toDelete.rbegin(), et = toDelete.rend(); it != et; ++it) {
+      (*it)->eraseFromParent();
+    }
+
     delete bitMap;
     delete valMap;
     delete config.fnBuilder;
-    delete out;
-    delete printer;
+    delete faintMaps;
 
-    return modified;
+    return toDelete.size() > 0;
   }
 
 };
-
-void printBitVector(const BitVector& bv) {
-  for (int i = 0; i < bv.size(); i++) {
-    outs() << (bv[i] ? "1" : "0"); 
-  }
-}
 
 
 // LLVM uses the address of this static member to identify the pass, so the
