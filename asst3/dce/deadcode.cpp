@@ -64,7 +64,6 @@ class FaintnessInstTransferFunction : public dataflow::TransferFunction {
 
     // Then all operands involved must be non-faint regardless of input value
     if (_non_faint_instr){
-      printf("Non faint instr");
       bv.reset(_killBV);
       return bv;
     }
@@ -149,30 +148,45 @@ class FaintnessTFBuilder : public dataflow::TransferFunctionBuilder {
     // Create the gen and kill set for this instr
     processInst(inst, &genBV, &killBV);
 
+    // TODO: In small.c, we are looking at a div operation but somehow, it doesn't get 
+    // categorized under mayHaveSideEffects or mayThrow. What?
     bool non_faint_instr = false;
     if (isa<TerminatorInst>(inst) || isa<DbgInfoIntrinsic>(inst) || 
-        isa<LandingPadInst>(inst) || inst->mayHaveSideEffects()){
-      // TODO: We should be here for return statements but I see no output of
-      // this print statement when I test straight line code. Why? Isn't a return statement
-      // a terminator instruction?
-      printf("Is a special non-faint instr");
+        isa<LandingPadInst>(inst) || inst->mayHaveSideEffects() || 
+        inst->mayThrow()){
       non_faint_instr = true;
     }
+    inst->print(outs());
+    outs() << "\tnon_faint_instr: " << non_faint_instr << "\n";
     return new FaintnessInstTransferFunction(genBV, killBV, non_faint_instr, bit_idx);
   }
 
-  // TODO: How exactly are phi nodes going to work here? Logically, it seems that a for
-  // an instr like x <-- phi (x1, x2 ... xn), x should be faint only if x1 till xn are 
-  // all faint. But I'm not sure exactly how to capture this with the infrastructure 
-  // you have going on for phi nodes
+  dataflow::TransferFunction *makePhiTransferFn(const PHINode *phi, 
+                                                const BasicBlock *prevBlock) const {
+    BitVector genBV(_n, false);
+    BitVector killBV(_n, false);
+   
+    // Create the gen and kill set for this instr
+    processLHS(phi, &genBV, &killBV);
+    Value *arg = phi->getIncomingValueForBlock(prevBlock);
+    processRHS(arg, &genBV, &killBV);
+
+    int bit_idx = _bitMap.lookup(phi);
+
+    return new FaintnessInstTransferFunction(genBV, killBV, false, bit_idx);
+  }
+
   dataflow::TransferFunction *makePhiSeqTransferFn(
       const vector<const PHINode *>& phis, const BasicBlock *prevBlock) const {
     BitVector genBV(_n, false);
     BitVector killBV(_n, false);
+
+    vector<dataflow::TransferFunction *> composition;
     for (auto it = phis.rbegin(), et = phis.rend(); it != et; ++it) {
-      processPhi(*it, prevBlock, &genBV, &killBV);
+      dataflow::TransferFunction *tf = makePhiTransferFn(*it, prevBlock);
+      composition.push_back(tf);
     }
-    return NULL;
+    return new ComposedTransferFunction(composition);
   }
 
   dataflow::TransferFunction *makeInstSeqTransferFn(
@@ -245,7 +259,6 @@ vector<const Value *> getValuesUsedInFunction(const Function& F) {
   return v;
 }
 
-/* TODO: update (the handout gave some hints I think?) */
 bool isTracked(const Value *v) {
   const Type *tp = v->getType();
   return ((isa<Instruction>(v) || isa<Argument>(v)) &&
@@ -291,8 +304,7 @@ class DeadCodeElimination : public FunctionPass {
     config.boundaryState = dataflow::onesVector(bitMap->size());
     return config;
   }
-
-
+  
  public:
   static char ID;
   DeadCodeElimination() : FunctionPass(ID) { }
@@ -310,12 +322,12 @@ class DeadCodeElimination : public FunctionPass {
     dataflow::printDataMap(F, *out, config.dir, printer);
 
     /* Remove all faint instructions here. */
-    // If variable t is define at line L and variable t is faint at line L+1, then it can be 
-    // safely eliminated
-    bool modified = false; 
-
+    // If variable t is defined at line L and variable t is faint at line L+1, then it can be 
+    // safely eliminated 
+    bool modified = false;
+  
     inst_iterator prev = inst_begin(F);
-    for (inst_iterator it = inst_begin(F), et = inst_end(F); it != et; ++it){
+    for (inst_iterator it = prev; it != inst_end(F); ++it){
       Instruction *prevI = &*prev; 
       if (prev != it && isTracked(prevI)) {
         Instruction *currI = &*it;
@@ -324,6 +336,13 @@ class DeadCodeElimination : public FunctionPass {
         int bit_idx = bitMap->lookup(prevI); 
         if (bv.test(bit_idx) == 1){        // Variable 
           // Line L can be safely eliminated
+          
+          // TODO: eraseFromParent removes instruction and drops all references to it. 
+          // Yet somehow we are getting a use remains when def is gone error
+          outs() << "Erasing: \n";
+          prevI->print(outs());
+          outs() << "\n";
+          // Erase the definition of prev and all its uses
           prev->eraseFromParent();
           modified = true;
         }
@@ -346,7 +365,6 @@ void printBitVector(const BitVector& bv) {
   for (int i = 0; i < bv.size(); i++) {
     outs() << (bv[i] ? "1" : "0"); 
   }
-  outs() << "\n";
 }
 
 

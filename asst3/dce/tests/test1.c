@@ -3,7 +3,7 @@ int foo(int x){
     int a = x + 2;  // dead code
     int b = a - 3;  // dead code
     int c = a + b;  // dead code
-    return x;
+    return a;
 }
 
 int main(){
