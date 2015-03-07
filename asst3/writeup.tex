@@ -71,14 +71,26 @@ Some important notes:
 \item	As per the piazza post, we do not guarantee to only move instructions that dominate all loop exits.
 \item	Because of the order in which we examined candidates, the instructions do not need to be topologically sorted before moving them to the preheater.
 \end{itemize}
-We evaluated performance by using the llvm interpreter instruction counter, as specified in the handout.
 
+The dead code elimination pass effectively implemented the faintness analysis
+from Homework 1. The one notable thing with this is that each since the transfer
+function is piecewise and requires information in the input bitvector - we
+needed to modify parts of our dataflow framework in order to accomodate that.
+This in particular meant that since this function didn't compose as easy as the
+transfer functions for liveness, we have to create a separate
+\texttt{ComposedTransferFunction} class which explicitly did the compositions of
+transfer functions for a sequence of instructions
+
+We evaluated performance of both passes by using the llvm interpreter instruction 
+counter, as specified in the handout. Both passes showed significant improvement
+when run against test cases tailored for these passes - as one would expect. In
+most general daily-use code however, it seems that both these passes have only a
+limited effect.
 
 \end{question}
 
 \newpage
 \begin{question}{Register Allocation}
-
 \end{question}
 \newpage
 
