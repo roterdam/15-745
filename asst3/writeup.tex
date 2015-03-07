@@ -73,24 +73,60 @@ Some important notes:
 \end{itemize}
 
 The dead code elimination pass effectively implemented the faintness analysis
-from Homework 1. The one notable thing with this is that each since the transfer
-function is piecewise and requires information in the input bitvector - we
+from Homework 1. The one notable thing with this is that since the transfer
+function is piecewise and requires information in the input bitvector, we
 needed to modify parts of our dataflow framework in order to accomodate that.
 This in particular meant that since this function didn't compose as easy as the
 transfer functions for liveness, we have to create a separate
 \texttt{ComposedTransferFunction} class which explicitly did the compositions of
-transfer functions for a sequence of instructions
+transfer functions for a sequence of instructions. 
+\\
+\\We made sure that an instruction which meet any of the following criteria is not
+dead code eliminated. \texttt{isa<TerminatorInst>(I)},
+\texttt{isa<DbgInfoIntrinsic>(I)}, \texttt{isa<LandingPadInst>(I)} or if
+\texttt{I->mayHaveSideEffects()}. In addition, any operand used by these
+instructions is marked as not being faint so that the preceding calculations are
+completed successfully.
 
-We evaluated performance of both passes by using the llvm interpreter instruction 
-counter, as specified in the handout. Both passes showed significant improvement
-when run against test cases tailored for these passes - as one would expect. In
-most general daily-use code however, it seems that both these passes have only a
-limited effect.
+\begin{center}
+\begin{tabular}{|c | c | c|}
+\hline
+Benchmark & Instructions exe before LICM & Instructions exe after LICM \\ \hline
+init2d.c & - & \\ \hline
+zmean.c & - & \\ \hline
+\end{tabular}
+\end{center}
 
+\begin{center}
+\begin{tabular}{|c | c | c|}
+\hline
+Benchmark & Instructions exe before DCE & Instructions exe after DCE \\ \hline
+bench1.c & 31 & \\ \hline
+bench2.c & 16030 & \\ \hline
+\end{tabular}
+\end{center}
 \end{question}
 
 \newpage
 \begin{question}{Register Allocation}
+\begin{itemize}
+\item Compute the liveness and reaching definitions of the variables in the
+graph and compute the merged live ranges. Live ranges are in black, reaching
+definitions in red
+\begin{center}
+\includegraphics[scale=0.6]{1.png}
+\end{center}
+
+\item Create the interference graph:
+\begin{center}
+\includegraphics[scale=0.6]{2.png}
+\end{center}
+\item Perform coloring and spilling. We are using Chaitin's algorithm here. The
+stack we obtain is: $[t, s, y, x, u]$. We then pop the stack and assign
+registers as follows: t gets r0, s gets r1, y gets r2, x gets r3 and u gets r2.
+We see here that we are able to assign all variables to registers without
+spilling.
+\end{itemize}
 \end{question}
 \newpage
 
