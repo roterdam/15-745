@@ -37,8 +37,8 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \newcommand{\myname}{Michael Choquette, Rokhini Prabhu}
 \newcommand{\myandrew}{mchoquet, rokhinip}
-\newcommand{\projectname}{Improving cache locality with coalesced map-reduce
-operations} 
+\newcommand{\projectname}{Improving Cache Locality with Coalesced Map-Reduce
+Operations} 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \newcommand{\code}[1]{\texttt{#1}}
@@ -54,27 +54,23 @@ operations}
 \end{center}
 
 \begin{question}{Project Web Page}
-
+http://www.andrew.cmu.edu/user/mchoquet/15745/index.html
 \end{question}
 
 \begin{question}{Project Description}
 \texttt{C0} is a safe subset of the C programming language augmented with
 contracts which has been developed here at CMU by Frank Pfenning and his team. 
-In our project, we would like to extend the \texttt{C0} language with additional
+In our project, we will extend the \texttt{C0} language with additional
 language constructs for \texttt{map}, \texttt{reduce} and \texttt{filter}
-constructs on immutable \texttt{sequences}. We chose \texttt{C0} since we have
-both written full fledged compilers targetting \texttt{C0} and it is also a
-small enough language for us to add additional constructs to. \\
-\\ On an optimization level, we are interested in the speedups that can be
-gained when we are performing several consecutive \texttt{map, reduce} 
-and \texttt{filter} operations on large \texttt{sequences}. 
-During such operations, we can leverage on speedups presented by
-locality  by composing the functions of these constructs
-together and applying them onto the sequence once instead of performing the
-operations one at a time. This exposes the speedups that is gained from
-locality. 
-\\
-\\ 
+constructs on immutable \texttt{sequences}. We chose \texttt{C0} since we are both
+comfortable with the language, and have access to a working \texttt{C0-C} compiler to
+build off of.\\
+
+Our goal is to investigate the speedups that can be gained from statically combining
+sequential \texttt{map}, \texttt{reduce}, and \texttt{filter} operations into compound
+operations by composing the kernels. This reduces the number of iterations through
+the data, improving locality, and removes intermediate allocations.\\
+
 We will evaluate the impact of our optimizations by timing the performance of
 benchmark tests. We expect our project to consist of 4 phases:
 \begin{enumerate}
@@ -92,32 +88,6 @@ only 3 out of the 4 stages. Our current optimization pass act on each function
 individually and given extra time, we would also like to explore how such
 optimizations would work on an inter-procedural level.
 \end{question}
-\newpage
-
-\begin{question}{Plan of Attack and Schedule}
-\begin{center}
-\begin{tabular}{|p{5cm}|p{5cm}|p{5cm}|}
-\hline
-Week & Work to be done & Who \\ \hline
-1 & Get C0 starter code, design grammar and typing rules for
-\texttt{map, reduce} and \texttt{filter} constructs & Rokhini and Michael \\ \hline
-2 & Implement \texttt{map, reduce} and \texttt{filter} in C0. Design rules for
-dependency analysis for coalescing map functions & Rokhini and
-Michael \\ \hline
-3 & Implement rules for phase (2) of project, design rules for phase (3) and (4) &
-Rokhini and Michael \\ \hline
-4 and 5 & Implement rules for phase (3) and (4) of project & Rokhini and Michael \\ \hline
-6 & Finish up any leftover work from week 4 and 5 and prepare for presentation &
-Rokhini and Michael \\ \hline
-\end{tabular}
-\end{center}
-\end{question}
-
-\begin{question}{Milestone}
-We can see that the milestone that we would like to have reached at the end of
-week 3 is to have finished implementing composition of map functions and
-determined how we are to implement phase (3) and (4) of the project.  
-\end{question}
 
 \begin{question}{Literature Search}
 Our main reference for literature is the documentation for the
@@ -127,16 +97,41 @@ will also be using the
 \href{http://c0.typesafety.net/doc/c0-reference.pdf}{\textit{Language guide for
 C0}} to ensure that we still adhere to the safety features of the language. 
 \end{question}
+
+\newpage
+
+\begin{question}{Plan of Attack and Schedule}
+\begin{center}
+\begin{tabular}{|p{5cm}|p{5cm}|p{5cm}|}
+\hline
+Week & Work to be done & Who \\ \hline
+1 & Get C0 starter code, design grammar and typing rules for
+\texttt{map, reduce} and \texttt{filter} constructs. & Rokhini and Michael \\ \hline
+2 & Implement \texttt{map, reduce} and \texttt{filter} in \texttt{C0}. Determine what
+dependency analysis needs to be done for coalescing map functions, and how
+to do it. &  Rokhini and Michael \\ \hline
+3 & Implement rules for phase (2) of project, design rules for phase (3) and (4). &
+Rokhini and Michael \\ \hline
+4 and 5 & Implement rules for phase (3) and (4) of project. & Rokhini and Michael \\ \hline
+6 & Finish up any leftover work from week 4 and 5 and prepare for presentation. &
+Rokhini and Michael \\ \hline
+\end{tabular}
+\end{center}
+\end{question}
+
+\begin{question}{Milestone}
+At the end of week 3 we would like to have finished implementing composition of
+map operations, and have a strong understanding of how to combine reduce and filter
+operations.
+\end{question}
+
 \begin{question}{Resources Needed}
-Apart from the source code for a C0 compiler, we will not needing any special
-resources or hardware for our project. We plan to run the code on the unix
-machines to test the performance improvements. For the C0 compiler which we 
-will be extending, we will be either using one of our own compilers from 
-15-411 or the C0 reference compiler.
+We will use a \texttt{C0}-to-\texttt{C} compiler, but no other special resources. We
+will run our code on the campus unix machines to test performance.
 \end{question}
 \begin{question}{Getting started}
 We have not done much apart from writing the proposal so far. We do not foresee
-any trouble with starting our project immediately
+any trouble with starting our project immediately.
 \end{question}
 
 \end{document}
