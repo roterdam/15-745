@@ -26,3 +26,8 @@
 *.exe
 *.out
 *.app
+
+# latex things
+*.aux
+*.log
+*.synctex.gz
