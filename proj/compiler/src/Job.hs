@@ -17,7 +17,7 @@ data Job = Job {
   deriving Show
 
 -- Output format.
-data OF = C0 | AST | PCT | OptPCT | IRT | OptIRT | B3Asm | SSA3Asm | OptSsa | B2Asm | XAsm
+data OF = C0 | AST | C
           deriving (Eq, Show)
 
 defaultJob :: Job
@@ -27,5 +27,5 @@ defaultJob = Job {
   lib   = Nothing,
   safe  = True,
   lvl   = 2,
-  fmt   = XAsm,
+  fmt   = C,
   verb  = False }

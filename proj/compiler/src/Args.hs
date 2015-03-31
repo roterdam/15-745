@@ -41,16 +41,7 @@ parseArgs args =
 
         fmtToExt :: [(OF, String)]
         fmtToExt = [(C0,       ".c0"),
-                    (AST,      ".ast"),
-                    (PCT,      ".pct"),
-                    (OptPCT,   ".opct"),
-                    (IRT,      ".irt"),
-                    (OptIRT,   ".oirt"),
-                    (B3Asm,    ".thr"),
-                    (SSA3Asm,  ".ssa"),
-                    (OptSsa,   ".ossa"),
-                    (B2Asm,    ".two"),
-                    (XAsm,     ".s")]
+                    (AST,      ".ast")]
 
         extToFmt :: [(String, OF)]
         extToFmt = map swap fmtToExt
@@ -65,17 +56,9 @@ argTable = [
   Option ['v']  ["verbose"]       (NoArg setVerb)                 "Turns on verbose errors. Errors are not verbose by default.",
   Option []     ["safe"]          (NoArg $ setSafe True)          "Specifies that the compiler should check for expections at runtime.",
   Option []     ["unsafe"]        (NoArg $ setSafe False)         "Speicifes that the compiler should NOT check for exceptions at runtime.",
-  Option ['c']  ["c0"]            (NoArg $ setFmt C0)             "Sets the output type to be C0 (act as a pretty printer).",
+  Option []  ["c0"]               (NoArg $ setFmt C0)             "Sets the output type to be C0 (act as a pretty printer).",
   Option ['a']  ["ast"]           (NoArg $ setFmt AST)            "Produces an abstract syntax tree.",
-  Option ['p']  ["pct"]           (NoArg $ setFmt PCT)            "Produces a PC tree.",
-  Option ['P']  ["optPCT"]        (NoArg $ setFmt OptPCT)         "Produces a optimized PC tree.",
-  Option ['i']  ["irt"]           (NoArg $ setFmt IRT)            "Produces an IR tree.",
-  Option ['I']  ["optIRT"]        (NoArg $ setFmt OptIRT)         "Produces an optimized IR tree.",
-  Option ['3']  ["b3asm"]         (NoArg $ setFmt B3Asm)          "Produces abstract 3-argument assembly.",
-  Option ['z']  ["ssa3asm"]       (NoArg $ setFmt SSA3Asm)        "Produces abstract 3-argument assembly in SSA form.",
-  Option ['Z']  ["optSsa"]        (NoArg $ setFmt OptSsa)         "Produces optimized 3-argument SSA assembly.",
-  Option ['2']  ["b2asm"]         (NoArg $ setFmt B2Asm)          "Produces abstract 2-argument assembly.",
-  Option ['s']  ["xasm"]          (NoArg $ setFmt XAsm)           "Produces x86-64 assembly."]
+  Option ['c']  ["c"]             (NoArg $ setFmt C)              "Proces C code."]
   where setFmt :: OF -> Job -> Job
         setFmt fmt job = job {fmt = fmt}
 
