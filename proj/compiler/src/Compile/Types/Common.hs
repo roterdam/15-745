@@ -132,7 +132,8 @@ instance Show Type where
 -- A (type, ident) pair.
 data Param = Param {
   paramT :: Type,
-  paramIdent :: Ident }
+  paramIdent :: Ident
+}
 instance Show Param where
   show (Param t ident) = show t ++ " " ++ ident
 

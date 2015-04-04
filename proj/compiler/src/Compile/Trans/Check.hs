@@ -21,13 +21,13 @@
           function.
 -}
 
-module Compile.Trees.Check where
+module Compile.Trans.Check where
 
 import Compile.Types.AST
 import qualified Compile.Types.Common as Common
-import Compile.Trees.CheckState
-import Compile.Trees.Conc
-import Compile.Trees.ConcEq
+import Compile.Trans.CheckState
+import Compile.Trans.Conc
+import Compile.Trans.ConcEq
 
 import Control.Monad.Error (catchError, throwError)
 import Control.Monad (foldM)

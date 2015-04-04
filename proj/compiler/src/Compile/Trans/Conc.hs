@@ -2,7 +2,7 @@
   This file defines the ConcT type for concrete types (vs. types that contain typedef'd types).
 -}
 
-module Compile.Trees.Conc where
+module Compile.Trans.Conc where
 
 import qualified Compile.Types.Common as Common
 

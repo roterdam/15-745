@@ -2,7 +2,7 @@
   This file contains functions for elaborating ParseTrees into ASTs.
 -}
 
-module Compile.Trees.GenAST where
+module Compile.Trans.GenAST where
 
 import qualified Compile.Types.Common as Common
 import qualified Compile.Types.AST as AST

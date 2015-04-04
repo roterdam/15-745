@@ -2,10 +2,10 @@
   This file contains types used to maintain state in the type-checker.
 -}
 
-module Compile.Trees.CheckState where
+module Compile.Trans.CheckState where
 
 import Compile.Types.AST
-import Compile.Trees.Conc
+import Compile.Trans.Conc
 import qualified Compile.Types.Common as Common
 
 import qualified Data.Map as Map

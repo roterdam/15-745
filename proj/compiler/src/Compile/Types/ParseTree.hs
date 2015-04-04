@@ -34,10 +34,8 @@ maybeShow m =
   case m of
     Nothing -> ""
     Just x -> show x
-tab :: String -> String
-tab = (++) "\t"
 indent :: String -> String
-indent = unlines . map tab . lines
+indent = unlines . map ("  " ++) . lines
 showTuple :: (Show a) => [a] -> String
 showTuple xs = "(" ++ (intercalate ", " $ map show xs) ++ ")"
 

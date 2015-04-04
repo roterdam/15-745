@@ -9,14 +9,6 @@ module Compile.Types.AST where
 import qualified Compile.Types.Common as Common
 import Data.List (intercalate)
 
--- Shows a list of statements, all indented, without a trailing newline.
--- TODO: try this out to make sure it actually works
-showStmts :: [Stmt] -> String
-showStmts b = case unlines $ map ((++) "\t" . show) b of
-  "" -> ""
-  s -> init s
-showTuple :: (Show a) => [a] -> String
-showTuple xs = "(" ++ (intercalate ", " $ map show xs) ++ ")"
 
 -- An abstract syntax tree.
 data AST = Prog [GDecl]
@@ -51,59 +43,112 @@ data LValue = LIdent Common.Ident | LStar LValue | LDot LValue Common.Ident | LI
 {-
   Show implementations at the end for clarity
 -}
-instance Show AST where
-  show (Prog gdecls) = intercalate "\n\n" $ (map show) gdecls
 
-instance Show GDecl where
-  show (Typedef t ident) = "typedef(" ++ show t ++ ", " ++ ident ++ ")"
-  show (Sigdef t ident params) = "sigdef(" ++ show t ++ ", " ++ ident ++ ", params" ++ showTuple params ++ ")"
-  show (FDecl t ident params) = "fdecl(" ++ show t ++ ", " ++ ident ++ ", params" ++ showTuple params ++ ")"
-  show (FExt t ident params) = "fext(" ++ show t ++ ", " ++ ident ++ ", params" ++ showTuple params ++ ")"
-  show (FDefn t ident params stmts) = "fdecl(" ++ show t ++ ", " ++ ident ++ ", params" ++ showTuple params ++ "):\n" ++ showStmts stmts
-  show (SDefn ident fields) = "sDef(" ++ ident ++ ", " ++ showTuple fields ++ ")"
+joinWith :: String -> [String] -> String
+joinWith = intercalate
+joinL :: [String] -> String
+joinL = joinWith ""
+
+showTuple :: (Show a) => [a] -> String
+showTuple xs = joinL ["(", (joinWith ", " $ map show xs), ")"]
 
 {-
-  NOTE: this implementation of show doesn't do pretty-printing b/c it can't :(
-  The only way to get pretty-printed statements is to show the whole AST
+  Pretty-prints a list of statements, given a prefix to put at the start of each
+  line (used for indenting). There is one newline after each statement,
+  including the last one.
 -}
--- TODO: come back and clean this up with some helpers
-instance Show Stmt where
-  show (Assn asop lValue e) = show lValue ++ " " ++ show asop ++ " " ++ show e
-  show (If e beforeStmts elseStmts) = "if (" ++ show e ++ "):\n" ++ showStmts beforeStmts ++ "\nelse:\n" ++ showStmts elseStmts
-  show (While e bodyStmts) = "while (" ++ show e ++ "):\n" ++ showStmts bodyStmts
-  show (Return maybeE) = "return (" ++ maybe "" show maybeE ++ ")"
-  show (Decl t ident maybeE scopeStmts) =
-    let defStmts = case maybeE of
-          Nothing -> []
-          Just e -> [Assn Common.Set (LIdent ident) e]
-    in "decl (" ++ show t ++ " " ++ show ident ++ "):\n" ++ showStmts (defStmts ++ scopeStmts)
-  show (Assert e) = "assert (" ++ show e ++ ")"
-  show (Exp e) = "exp (" ++ show e ++ ")"
+showStmts :: String -> [Stmt] -> String
+showStmts prefix stmts = joinL $ map (showStmt prefix) stmts
 
+{-
+  Pretty-prints a single statement, given a prefix to put at the start of the
+  string (used for indenting). The string will end in a newline.
+-}
+showStmt :: String -> Stmt -> String
+showStmt p (Assn op lv e) = joinL [p, show lv, " ", show op, " ", show e, "\n"]
+showStmt p (If e tStmts []) = joinL [p, "if (", show e, ") {\n",
+                                     showStmts ("  " ++ p) tStmts,
+                                     p, "}\n"]
+showStmt p (If e tStmts fStmts) = joinL [p, "if (", show e, ") {\n",
+                                        showStmts ("  " ++ p) tStmts,
+                                        p, "} else {\n",
+                                        showStmts ("  " ++ p) fStmts,
+                                        p, "}\n"]
+showStmt p (While e stmts) = joinL [p, "while (", show e, ") {\n",
+                                   showStmts ("  " ++ p) stmts,
+                                   p, "}\n"]
+showStmt p (Return Nothing) = joinL [p, "return;\n"]
+showStmt p (Return (Just e)) = joinL [p, "return ", show e, ";\n"]
+showStmt p (Decl t ident Nothing stmts) =
+  joinL [p, show t, " ", ident, ";\n", showStmts p stmts]
+showStmt p (Decl t ident (Just e) stmts) =
+  joinL [p, show t, " ", ident, " = ", show e, ";\n", showStmts p stmts]
+showStmt p (Assert e) = joinL [p, "assert(", show e, ")\n"]
+showStmt p (Exp e) = joinL [p, show e, ";\n"]
+
+
+{-
+  Turns an AST into a newline-terminated string.
+-}
+instance Show AST where
+  show (Prog gdecls) = joinWith "\n" $ map show gdecls
+
+{-
+  Turns a GDecl into a newline-terminated string.
+-}
+instance Show GDecl where
+  show (Typedef t ident) = joinL ["tyepdef(", show t, ", ", ident, ")\n"]
+  show (Sigdef t ident params) =
+    joinL ["sigdef(", show t, ", ", ident, ", ", showTuple params, ")\n"]
+  show (FDecl t ident params) =
+    joinL ["fdecl(", show t, ", ", ident, ", ", showTuple params, ")\n"]
+  show (FExt t ident params) =
+    joinL ["fext(", show t, ", ", ident, ", ", showTuple params, ")\n"]
+  show (FDefn t ident params stmts) =
+    joinL ["fdecl(", show t, ", ", ident, ", ", showTuple params, "):\n",
+          showStmts "  " stmts]
+  show (SDefn ident fields) =
+    joinL ["sDef(", ident, ", ", showTuple fields, ")\n"]
+
+
+{-
+  Turns a statement into a newline-terminated string.
+-}
+instance Show Stmt where
+  show stmt = showStmt "" stmt
+
+
+{-
+  Turns an expression into a string. Note that the string will not have
+  parentheses around it, but translated subexpressions might.
+-}
 instance Show Exp where
-  show (IntLit num) = "num(" ++ show num ++ ")"
-  show (BoolLit bool) = "bool(" ++ show bool ++ ")"
+  show (IntLit num) = show num
+  show (BoolLit bool) = show bool
   show (CharLit c) = show c
   show (StringLit s) = show s
   show (Ident ident) = ident
-  show (Binop binop e1 e2) = "(" ++ show e1 ++ " " ++ show binop ++ " " ++ show e2 ++ ")"
-  show (Unop unop e) = "(" ++ show unop ++ show e ++ ")"
-  show (Cond e1 e2 e3) = "(" ++ show e1 ++ " ? " ++ show e2 ++ " : " ++ show e3 ++ ")"
-  show (Call e args) = "call(" ++ show e ++ ", args" ++ showTuple args ++ ")"
-  show (Alloc t) = "alloc(" ++ show t ++ ")"
-  show (AllocArray t e) = "alloc_array(" ++ show t ++ ", " ++ show e ++ ")"
-  show (Index addr index) = show addr ++ "[" ++ show index ++ "]"
-  show (Star addr) = "(*" ++ show addr ++ ")"
-  show (Dot addr field) = show addr ++ "." ++ field
+  show (Binop op e1 e2) =
+    joinL ["(", show e1, ") ", show op, " (", show e2, ")"]
+  show (Unop op e) = joinL [show op, "(", show e, ")"]
+  show (Cond e1 e2 e3) =
+    joinL ["(", show e1, ") ? (", show e2, ") : (", show e3, ")"]
+  show (Call (Ident ident) args) = joinL [ident, showTuple args]
+  show (Call e args) = joinL ["(", show e, ")", showTuple args]
+  show (Alloc t) = joinL ["alloc(", show t, ")"]
+  show (AllocArray t e) = joinL ["alloc_array(", show t, ", ", show e, ")"]
+  show (Index addr idx) = joinL ["(", show addr, ")[", show idx, "]"]
+  show (Star addr) = joinL ["*(", show addr, ")"]
+  show (Dot addr field) = joinL ["(", show addr, ").", field]
   show Null = "NULL"
-  show (Amp ident) = "(&" ++ ident ++ ")"
-  show (Cast t e) = "((" ++ show t ++ ") " ++ show e ++ ")"
+  show (Amp ident) = joinL ["&", ident]
+  show (Cast t e) = joinL ["(", show t, ")(", show e, ")"]
 
 instance Show LValue where
   show (LIdent ident) = ident
-  show (LIndex arr index) = show arr ++ "[" ++ show index ++ "]"
-  show (LStar addr) = "(*" ++ show addr ++ ")"
-  show (LDot struct field) = show struct ++ "." ++ field
+  show (LIndex addr idx) = joinL ["(", show addr, ")[", show idx, "]"]
+  show (LStar addr) = joinL ["*(", show addr, ")"]
+  show (LDot addr field) = joinL ["(", show addr, ").", field]
 
 instance Show Binop where
   show (CmpOp cmpop) = show cmpop

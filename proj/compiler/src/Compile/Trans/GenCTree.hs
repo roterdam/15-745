@@ -2,7 +2,7 @@
   Converts ASTs into CTrees.
 -}
 
-module Compile.Trees.GenCTree where
+module Compile.Trans.GenCTree where
 
 import qualified Compile.Types.Common as Common
 import qualified Compile.Types.AST as AST

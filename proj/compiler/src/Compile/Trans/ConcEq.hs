@@ -1,10 +1,10 @@
 {-
     This file contains equality helper functions for concrete types (Concs).
 -}
-module Compile.Trees.ConcEq where
+module Compile.Trans.ConcEq where
 
-import Compile.Trees.Conc
-import Compile.Trees.CheckState (GlobalState, sigdefs)
+import Compile.Trans.Conc
+import Compile.Trans.CheckState (GlobalState, sigdefs)
 
 import qualified Data.Map as Map
 

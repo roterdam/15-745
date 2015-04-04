@@ -6,9 +6,9 @@ module Compile (compile, Job(..), defaultJob, OF(..)) where
 import Job
 import Error (liftEither)
 import Compile.Parse.Parse (parseFiles, readFiles)
-import Compile.Trees.GenAST (ptToAST)
-import Compile.Trees.GenCTree (astToCTree)
-import Compile.Trees.Check (check)
+import Compile.Trans.GenAST (ptToAST)
+import Compile.Trans.GenCTree (astToCTree)
+import Compile.Trans.Check (check)
 
 compile :: Job -> IO ()
 compile job = do

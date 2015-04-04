@@ -41,7 +41,8 @@ parseArgs args =
 
         fmtToExt :: [(OF, String)]
         fmtToExt = [(C0,       ".c0"),
-                    (AST,      ".ast")]
+                    (AST,      ".ast"),
+                    (C,         ".c")]
 
         extToFmt :: [(String, OF)]
         extToFmt = map swap fmtToExt
