@@ -25,7 +25,6 @@ data Stmt = Assn Common.Asop LValue Exp | If Exp [Stmt] [Stmt] | While Exp [Stmt
           | Return (Maybe Exp) | Decl Common.Type Common.Ident (Maybe Exp) [Stmt] | Assert Exp | Exp Exp
 
 -- An expression.
--- Note that we remove unary operators, since we can elaborate them to Binops.
 data Exp = IntLit Common.IntLit | BoolLit Bool | CharLit Char | StringLit String
          | Ident Common.Ident | Binop Binop Exp Exp | Unop Unop Exp | Cond Exp Exp Exp | Call Exp [Exp]
          | Alloc Common.Type | AllocArray Common.Type Exp | Index Exp Exp | Star Exp | Dot Exp Common.Ident
@@ -70,13 +69,13 @@ showStmt p (If e tStmts []) = joinL [p, "if (", show e, ") {\n",
                                      showStmts ("  " ++ p) tStmts,
                                      p, "}\n"]
 showStmt p (If e tStmts fStmts) = joinL [p, "if (", show e, ") {\n",
-                                        showStmts ("  " ++ p) tStmts,
-                                        p, "} else {\n",
-                                        showStmts ("  " ++ p) fStmts,
-                                        p, "}\n"]
+                                         showStmts ("  " ++ p) tStmts,
+                                         p, "} else {\n",
+                                         showStmts ("  " ++ p) fStmts,
+                                         p, "}\n"]
 showStmt p (While e stmts) = joinL [p, "while (", show e, ") {\n",
-                                   showStmts ("  " ++ p) stmts,
-                                   p, "}\n"]
+                                    showStmts ("  " ++ p) stmts,
+                                    p, "}\n"]
 showStmt p (Return Nothing) = joinL [p, "return;\n"]
 showStmt p (Return (Just e)) = joinL [p, "return ", show e, ";\n"]
 showStmt p (Decl t ident Nothing stmts) =
@@ -110,13 +109,11 @@ instance Show GDecl where
   show (SDefn ident fields) =
     joinL ["sDef(", ident, ", ", showTuple fields, ")\n"]
 
-
 {-
   Turns a statement into a newline-terminated string.
 -}
 instance Show Stmt where
   show stmt = showStmt "" stmt
-
 
 {-
   Turns an expression into a string. Note that the string will not have

@@ -10,4 +10,4 @@ import qualified Compile.Types.CTree as CTree
 import qualified Job as Job
 
 astToCTree :: Job.Job -> AST.AST -> CTree.CTree
-astToCTree _ _ = CTree.Prog
+astToCTree _ _ = CTree.Prog []
