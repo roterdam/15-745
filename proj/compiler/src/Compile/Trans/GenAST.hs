@@ -106,12 +106,7 @@ elabExp (PT.BoolLit b) = AST.BoolLit b
 elabExp (PT.CharLit c) = AST.CharLit c
 elabExp (PT.StringLit s) = AST.StringLit s
 elabExp (PT.Ident ident) = AST.Ident ident
--- TODO: do we need the special case for neg?
-elabExp (PT.Unop Common.Neg e) =
-  case (elabExp e) of
-    (AST.IntLit (Common.Dec d)) -> AST.IntLit $ Common.Dec $ -1 * d
-    e' -> AST.Binop (AST.ArithOp Common.ASub) zero e'
-elabExp (PT.Unop unop e ) = AST.Unop unop $ elabExp e
+elabExp (PT.Unop unop e) = AST.Unop unop $ elabExp e
 elabExp (PT.Binop binop e1 e2) = AST.Binop (elabBinop binop) (elabExp e1) (elabExp e2)
 elabExp (PT.Cond e1 e2 e3) = AST.Cond (elabExp e1) (elabExp e2) (elabExp e3)
 elabExp (PT.Call e args) = AST.Call (elabExp e) $ map elabExp args

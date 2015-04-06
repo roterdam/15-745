@@ -26,9 +26,10 @@ data Stmt = Assn Common.Asop LValue Exp | If Exp [Stmt] [Stmt] | While Exp [Stmt
 
 -- An expression.
 data Exp = IntLit Common.IntLit | BoolLit Bool | CharLit Char | StringLit String
-         | Ident Common.Ident | Binop Binop Exp Exp | Unop Unop Exp | Cond Exp Exp Exp | Call Exp [Exp]
-         | Alloc Common.Type | AllocArray Common.Type Exp | Index Exp Exp | Star Exp | Dot Exp Common.Ident
-         | Amp Common.Ident | Cast Common.Type Exp | Null
+         | Ident Common.Ident | Binop Binop Exp Exp | Unop Unop Exp
+         | Cond Exp Exp Exp | Call Exp [Exp] | Alloc Common.Type
+         | AllocArray Common.Type Exp | Index Exp Exp | Star Exp
+         | Dot Exp Common.Ident | Amp Common.Ident | Cast Common.Type Exp | Null
 
 -- A Binary operator.
 data Binop = ArithOp Common.ArithOp | CmpOp Common.CmpOp | LogOp Common.LogOp

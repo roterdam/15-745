@@ -1,6 +1,0 @@
-int main() {
-  int x = 10;
-  int y;
-  y = (x << x);
-  return (x | y) * (y / x);
-}

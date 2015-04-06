@@ -1,0 +1,275 @@
+// Test of conversion of non-sequence features. Look at this to make sure things
+// look ok.
+
+
+
+
+// typedefs
+typedef int my_int_t;
+typedef struct Foo my_struct_t;
+typedef struct Foo *my_struct_ptr_t;
+
+// sigdefs
+// typedef int (my_intfunc_t)(int);
+// typedef void (my_ptrfunc_t)(my_struct_ptr_t);
+
+
+
+
+
+// function declarations
+// int sum(my_int_func_t f, int n);
+bool update2(int *p);
+
+
+
+
+
+
+
+// struct definitions
+struct Foo {
+  int x;
+};
+
+struct Bar {
+  struct Foo foo;
+  my_struct_ptr_t fooPtr;
+};
+
+
+
+
+
+
+// statements
+int testAssn(int n) {
+  int x;
+  x = n;
+  x += n;
+  x -= n;
+  x *= n;
+  x /= n;
+  x %= n;
+  x &= n;
+  x |= n;
+  x ^= n;
+  x <<= n;
+  x >>= n;
+  return x;
+}
+
+int testControlFlow(int n) {
+
+  if (true) {
+  } else {
+  }
+
+  if (n < 10) {
+    n *= 2;
+  } else {
+    n *= 3;
+  }
+
+  if (n > 100) {
+    n += n/10;
+  }
+
+  if (n < 1000) {
+    if (n > 500) {
+    } else {
+      n += 337;
+    }
+    n %= 1000;
+  }
+
+  if (n % 4 == 0) {
+    n += 2;
+  } else if (n % 4 == 1) {
+    n += 3;
+  } else if (n % 4 == 2) {
+    n += 0;
+  } else {
+    n += 1;
+  }
+
+  while (n > 10000) {
+    n /= 2;
+    if (n % 2 == 1) {
+      n += 13;
+    }
+  }
+
+  int *nPtr = alloc(int);
+  *nPtr = 15;
+  while (update2(nPtr)) {
+
+  }
+
+  if (*nPtr < n) {
+    return *nPtr;
+  }
+  return n;
+}
+
+bool update2(int *nPtr) {
+  if (nPtr == NULL || *nPtr <= 10) {
+    return false;
+  }
+  (*nPtr)--;
+  return true;
+}
+
+
+void testDecl() {
+  int x;
+  int *y;
+  int[][][] z;
+  struct Bar *b;
+  struct Foo *f = NULL;
+  my_struct_ptr_t sPtr;
+  return;
+}
+
+
+
+
+
+// literal expressions
+
+void testLiterals() {
+  int n = 123456;
+  int n2 = 0x2233FCF;
+  bool t = true;
+  bool f = false;
+  char c1 = 'a';
+  char c2 = '\a';
+  char c3 = '\b';
+  char c4 = '\f';
+  char c5 = '\n';
+  char c6 = '\r';
+  char c7 = '\t';
+  char c8 = '\v';
+  char c9 = '\\';
+  char c10 = '\'';
+  char c11 = '\"';
+  char c13 = '\0';
+  string s1 = "";
+  string s2 = "abcdef";
+  return;
+}
+
+
+
+
+// unops/binops/cond
+
+int testOps() {
+  int a = 1 + 1;
+  int b = 1 - 1;
+  int c = 1 * 1;
+  int d = 1 / 1;
+  int e = 1 % 1;
+  int f = 1 & 1;
+  int g = 1 | 1;
+  int h = 1 ^ 1;
+  int i = 1 << 1;
+  int j = 1 >> 1;
+  bool k = 1 < 1;
+  bool l = 1 <= 1;
+  bool m = 1 == 1;
+  bool n = 1 != 1;
+  bool o = 1 >= 1;
+  bool p = 1 > 1;
+  bool r = k && l;
+  bool s = m || n;
+  bool t = !o;
+  int u = ~a;
+  int v = -b;
+  int x1 = (a + b + c + d) * (e + f);
+  int x2 = ((a / b) % (c / d));
+  int x3 = k ? g : h;
+  int x4 = l ? (g * g) : (h + i / j);
+  int x5 = (n ? o : p) ? a : b;
+  int x6 = r ? (s ? a : b) : (t ? c : d);
+  return a + b + c + d + e + f + g + h + i + j + u + v + x1 + x2 + x3 + x4 + x5
+         + x6;
+}
+
+
+
+
+
+// array/pointer things
+
+int testMem() {
+  int *p1;
+  int *p2 = NULL;
+  int *p3 = alloc(int);
+  *p3 = 0;
+  *p3 = *p3 + 1;
+  if (update2(p3)) {
+    (*p3)--;
+  }
+
+  int[] ints = alloc_array(int, 3);
+  ints[0] = 0;
+  ints[1] = 1;
+  ints[2] = 2;
+
+  struct Foo *fooPtr = alloc(struct Foo);
+  fooPtr->x = 100;
+  ((*fooPtr).x)++;
+  struct Bar[] bars = alloc_array(struct Bar, 10);
+  for (int i = 0; i < 10; i++) {
+    bars[i].fooPtr = alloc(my_struct_t);
+    bars[i].fooPtr->x = i * 3;
+  }
+
+  int[]*[][]** complicated1 = alloc(int[]*[][]*);
+  *complicated1 = alloc(int[]*[][]);
+  **complicated1 = alloc_array(int[]*[], 2);
+  (**complicated1)[0] = alloc_array(int[]*, 2);
+  (**complicated1)[0][0] = alloc(int[]);
+  *((**complicated1)[0][0]) = alloc_array(int, 2);
+  (*((**complicated1)[0][0]))[0] = 1;
+
+  int*[]**[][] complicated2 = alloc_array(int*[]**[], 1);
+  complicated2[0] = alloc_array(int*[]**, 2);
+  complicated2[0][0] = alloc(int*[]*);
+  *(complicated2[0][0]) = alloc(int*[]);
+  **(complicated2[0][0]) = alloc_array(int*, 2);
+  (**(complicated2[0][0]))[0] = alloc(int);
+  *((**(complicated2[0][0]))[0]) = 2;
+
+  return (*((**complicated1)[0][0]))[0] + *((**(complicated2[0][0]))[0]);
+}
+
+
+
+
+// void *
+
+int testVoidPointers() {
+  void *p1 = NULL;
+  void *p2 = (void *)alloc(int);
+  int *p3 = (int *)p2;
+  *p3 = 5;
+  return *((int *)p2);
+}
+
+
+
+
+
+
+int main() {
+  testAssn(12345);
+  testControlFlow(12345);
+  testDecl();
+  testLiterals();
+  testOps();
+  testMem();
+  testVoidPointers();
+  return 0;
+}

@@ -38,7 +38,7 @@ instance Show IntLit where
 data Asop = Set | SetOp ArithOp
 instance Show Asop where
   show Set = "="
-  show (SetOp arithop) = "=" ++ show arithop
+  show (SetOp arithop) = show arithop ++ "="
 
 {-
   Binary comparison operators.
@@ -128,7 +128,6 @@ instance Show Type where
   show (PtrT t) = show t ++ "*"
   show (ArrT t) = show t ++ "[]"
 
-
 -- A (type, ident) pair.
 data Param = Param {
   paramT :: Type,
@@ -136,6 +135,7 @@ data Param = Param {
 }
 instance Show Param where
   show (Param t ident) = show t ++ " " ++ ident
+
 
 -- Given a cmp c, gets c' such that for all a, b: c a b == not (c' a b).
 flipCmp :: Cmp -> Cmp
