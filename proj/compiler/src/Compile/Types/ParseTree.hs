@@ -45,8 +45,10 @@ data ParseTree = Prog [GDecl]
 -- A declaration in the program's global scope.
 -- TODO: Is it ideal to have ExDecl here?
 -- TODO: it's a little weird to use Params in SDefn
-data GDecl = Typedef Common.Type Common.Ident | Sigdef Common.Type Common.Ident [Common.Param]
-           | FDecl Common.Type Common.Ident [Common.Param] | FExt Common.Type Common.Ident [Common.Param]
+data GDecl = Typedef Common.Type Common.Ident 
+           | Sigdef Common.Type Common.Ident [Common.Param]
+           | FDecl Common.Type Common.Ident [Common.Param] 
+           | FExt Common.Type Common.Ident [Common.Param]
            | FDefn Common.Type Common.Ident [Common.Param] Block
            | SDecl Common.Ident | SDefn Common.Ident [Common.Param]
 
@@ -58,21 +60,31 @@ data Stmt = Simp Simp | Ctrl Ctrl | Block Block
 
 -- A simple statement (i.e. a statement which doesn't contain another block or control structure).
 -- Note that Decl optionally takes a value to assign to the identifier.
-data Simp = Assn Common.Asop LValue Exp | Post LValue Postop | Decl Common.Type Common.Ident (Maybe Exp) | Exp Exp
+data Simp = Assn Common.Asop LValue Exp 
+            | Post LValue Postop 
+            | Decl Common.Type Common.Ident (Maybe Exp) 
+            | Exp Exp
 
 -- A control structure.
 -- NOTE: that If optionally takes an else statement.
-data Ctrl = If Exp Stmt (Maybe Stmt) | While Exp Stmt | For (Maybe Simp) Exp (Maybe Simp) Stmt
-          | Assert Exp | Return (Maybe Exp)
+data Ctrl = If Exp Stmt (Maybe Stmt) | While Exp Stmt 
+          | For (Maybe Simp) Exp (Maybe Simp) Stmt
+          | Assert Exp 
+          | Return (Maybe Exp)
 
 -- An expression.
 -- NOTE: Haskell Strings differ from C0 strings in that Haskell Strings can contain null
 -- characters. However, that's what we want at this point (null characters will causes check errors
 -- later).
-data Exp = IntLit Common.IntLit | BoolLit Bool | CharLit Char | StringLit String | Ident Common.Ident
-         | Unop Unop Exp | Binop Binop Exp Exp | Cond Exp Exp Exp | Call Exp [Exp]
-         | Alloc Common.Type | AllocArray Common.Type Exp | Index Exp Exp | Star Exp | Arrow Exp Common.Ident
+data Exp = IntLit Common.IntLit | BoolLit Bool | CharLit Char 
+         | StringLit String | Ident Common.Ident
+         | Unop Unop Exp | Binop Binop Exp Exp | Cond Exp Exp Exp 
+         | Call Exp [Exp] | Alloc Common.Type | AllocArray Common.Type Exp 
+         | Index Exp Exp | Star Exp | Arrow Exp Common.Ident
          | Dot Exp Common.Ident | Null | Amp Common.Ident | Cast Common.Type Exp
+         | Tabulate Exp Exp | ListSeq [Exp] | RangeSeq Exp Exp
+         | Map Exp Exp | Reduce Exp Exp Exp | Filter Exp Exp 
+         | Combine Exp Exp Exp 
 
 -- A value that can be assigned into (i.e. can go on the left side of an assignement operation).
 data LValue = LIdent Common.Ident | LDot LValue Common.Ident | LArrow LValue Common.Ident | LStar LValue
@@ -147,6 +159,14 @@ instance Show Exp where
   show Null = "NULL"
   show (Amp ident) = "&" ++ ident
   show (Cast t e) = "(" ++ show t ++ ") " ++ show e
+  -- Sequence operations 
+  show (Tabulate f s) = "tabulate " ++ show f ++ " " ++ show s
+  show (RangeSeq start end) = "<" ++ show start ++ ".." ++ show end ++ ">"  
+  show (ListSeq elems) = "<" ++ (foldl (\a b -> a ++ ", " ++ show b) "" elems) ++ ">"  
+  show (Map f s) = "map " ++ show f ++ " (" ++ show s ++ ")"
+  show (Reduce f b s) = "reduce " ++ show f ++ " " ++ show b ++ " " ++ show s 
+  show (Filter f s) = "filter " ++ show f ++ " " ++ show s 
+  show (Combine f a b) = "combine " ++ show f ++ " " ++  show a ++ " " ++ show b
 
 instance Show LValue where
   show (LIdent ident) = ident

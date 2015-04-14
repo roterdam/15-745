@@ -14,22 +14,32 @@ import Data.List (intercalate)
 data AST = Prog [GDecl]
 
 -- A declaration in the global scope.
--- TODO: should AST and ParseTree differentiate FnName and TypeName from Common.Ident like other types do?
-data GDecl = Typedef Common.Type Common.Ident | Sigdef Common.Type Common.Ident [Common.Param]
-           | FDecl Common.Type Common.Ident [Common.Param] | FExt Common.Type Common.Ident [Common.Param]
+-- TODO: should AST and ParseTree differentiate FnName and TypeName from 
+-- Common.Ident like other types do?
+data GDecl = Typedef Common.Type Common.Ident 
+           | Sigdef Common.Type Common.Ident [Common.Param]
+           | FDecl Common.Type Common.Ident [Common.Param] 
+           | FExt Common.Type Common.Ident [Common.Param]
            | FDefn Common.Type Common.Ident [Common.Param] [Stmt]
            | SDefn Common.Ident [Common.Param]
 
--- A statement. Note that we separate declaration and assignment for easier typechecking.
-data Stmt = Assn Common.Asop LValue Exp | If Exp [Stmt] [Stmt] | While Exp [Stmt]
-          | Return (Maybe Exp) | Decl Common.Type Common.Ident (Maybe Exp) [Stmt] | Assert Exp | Exp Exp
+-- A statement. Note that we separate declaration and assignment for easier 
+-- typechecking.
+data Stmt = Assn Common.Asop LValue Exp | If Exp [Stmt] [Stmt] 
+          | While Exp [Stmt] | Return (Maybe Exp) 
+          | Decl Common.Type Common.Ident (Maybe Exp) [Stmt] | Assert Exp 
+          | Exp Exp
 
 -- An expression.
-data Exp = IntLit Common.IntLit | BoolLit Bool | CharLit Char | StringLit String
-         | Ident Common.Ident | Binop Binop Exp Exp | Unop Unop Exp
-         | Cond Exp Exp Exp | Call Exp [Exp] | Alloc Common.Type
-         | AllocArray Common.Type Exp | Index Exp Exp | Star Exp
-         | Dot Exp Common.Ident | Amp Common.Ident | Cast Common.Type Exp | Null
+data Exp = IntLit Common.IntLit | BoolLit Bool | CharLit Char 
+         | StringLit String | Ident Common.Ident | Binop Binop Exp Exp 
+         | Unop Unop Exp | Cond Exp Exp Exp | Call Exp [Exp] 
+         | Alloc Common.Type | AllocArray Common.Type Exp | Index Exp Exp 
+         | Star Exp | Dot Exp Common.Ident | Amp Common.Ident 
+         | Cast Common.Type Exp | Null
+         | Tabulate Exp Exp | ListSeq [Exp]  
+         | Map Exp Exp | Reduce Exp Exp Exp | Filter Exp Exp 
+         | Combine Exp Exp Exp 
 
 -- A Binary operator.
 data Binop = ArithOp Common.ArithOp | CmpOp Common.CmpOp | LogOp Common.LogOp
@@ -38,7 +48,8 @@ data Binop = ArithOp Common.ArithOp | CmpOp Common.CmpOp | LogOp Common.LogOp
 type Unop = Common.Unop
 
 -- A value we can assign into.
-data LValue = LIdent Common.Ident | LStar LValue | LDot LValue Common.Ident | LIndex LValue Exp
+data LValue = LIdent Common.Ident | LStar LValue | LDot LValue Common.Ident 
+             | LIndex LValue Exp
 
 {-
   Show implementations at the end for clarity
@@ -141,6 +152,13 @@ instance Show Exp where
   show Null = "NULL"
   show (Amp ident) = joinL ["&", ident]
   show (Cast t e) = joinL ["(", show t, ")(", show e, ")"]
+  show (Tabulate f e) = joinL ["tabulate ", show f, show e]
+  show (ListSeq elems) = joinL ["<", (foldl (\a b -> a ++ ", " ++ show b)
+                                 "" elems), ">"]
+  show (Map f s) = joinL ["map ", show f, show s]
+  show (Reduce f b s) = joinL ["reduce ", show f,  show b, show s]
+  show (Filter p s) = joinL ["filter ", show p, show s]
+  show (Combine f a b) = joinL ["combine ", show f, show a, show b] 
 
 instance Show LValue where
   show (LIdent ident) = ident
