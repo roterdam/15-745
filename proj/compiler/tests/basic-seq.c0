@@ -1,0 +1,19 @@
+int A_constr(int i){
+    return i;
+}
+
+int B_constr(int i){
+    return i+2;
+}
+
+int add(int a, int b){
+    return a+b;
+}
+
+int main(){
+    int<> A = tabulate A_constr 10000;
+    int<> B = tabulate B_constr 10000;
+
+    int<> C = combine add A B;
+    return (reduce add 0 C);
+}

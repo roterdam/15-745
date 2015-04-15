@@ -82,13 +82,14 @@ data Exp = IntLit Common.IntLit | BoolLit Bool | CharLit Char
          | Call Exp [Exp] | Alloc Common.Type | AllocArray Common.Type Exp 
          | Index Exp Exp | Star Exp | Arrow Exp Common.Ident
          | Dot Exp Common.Ident | Null | Amp Common.Ident | Cast Common.Type Exp
-         | Tabulate Exp Exp | ListSeq [Exp] | RangeSeq Exp Exp
-         | Map Exp Exp | Reduce Exp Exp Exp | Filter Exp Exp 
+         -- Sequence operations
+         | ListSeq [Exp] | RangeSeq Exp Exp
+         | Tabulate Exp Exp | Map Exp Exp | Reduce Exp Exp Exp | Filter Exp Exp 
          | Combine Exp Exp Exp 
 
 -- A value that can be assigned into (i.e. can go on the left side of an assignement operation).
-data LValue = LIdent Common.Ident | LDot LValue Common.Ident | LArrow LValue Common.Ident | LStar LValue
-            | LIndex LValue Exp
+data LValue = LIdent Common.Ident | LDot LValue Common.Ident | LArrow LValue Common.Ident 
+            | LStar LValue | LIndex LValue Exp
 
 -- A binary operator.
 -- TODO: move this out into common
@@ -162,7 +163,7 @@ instance Show Exp where
   -- Sequence operations 
   show (Tabulate f s) = "tabulate " ++ show f ++ " " ++ show s
   show (RangeSeq start end) = "<" ++ show start ++ ".." ++ show end ++ ">"  
-  show (ListSeq elems) = "<" ++ (foldl (\a b -> a ++ ", " ++ show b) "" elems) ++ ">"  
+  show (ListSeq elems) = "<" ++ (foldl (\a b -> a ++ show b ++ ",") "" elems) ++ ">"  
   show (Map f s) = "map " ++ show f ++ " (" ++ show s ++ ")"
   show (Reduce f b s) = "reduce " ++ show f ++ " " ++ show b ++ " " ++ show s 
   show (Filter f s) = "filter " ++ show f ++ " " ++ show s 

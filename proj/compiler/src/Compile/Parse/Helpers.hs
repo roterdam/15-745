@@ -142,6 +142,60 @@ parseExpNonCond = buildExpressionParser table parseTerm
         -- Parses a term with no postfix component (a literal, built-in, ident, reference, or cast).
         parseTermBase :: Parser Exp
         parseTermBase = (do
+          --traceM "parseExpNonCond.parseTermBase.Tabulate"
+          reserved "tabulate"
+          f <- parseExp
+          n <- parseExp
+          return $ Tabulate f n
+          ) <|> (do
+          --traceM "parseExpNonCond.parseTermBase.Map"
+          reserved "map"
+          f <- parseExp
+          s <- parseExp
+          return $ Map f s
+          ) <|> (do
+          --traceM "parseExpNonCond.parseTermBase.Reduce"
+          reserved "reduce"
+          f <- parseExp
+          b <- parseExp
+          s <- parseExp
+          return $ Reduce f b s 
+          ) <|> (do
+          --traceM "parseExpNonCond.parseTermBase.Filter"
+          reserved "filter"
+          p <- parseExp
+          s <- parseExp
+          return $ Filter p s
+          ) <|> (do
+          --traceM "parseExpNonCond.parseTermBase.Combine"
+          reserved "combine"
+          f <- parseExp
+          a <- parseExp
+          b <- parseExp 
+          return $ Combine f a b
+          ) <|> (do
+          --traceM "parseExpNonCond.parseTermBase.seq"
+          reserved "seq"
+          parens (do 
+            start <- parseExp
+            listSeq <- lookAhead ((do
+                        comma 
+                        return True
+                        ) <|> (do
+                        reservedOp ".."
+                        return False
+                        ))
+            if listSeq
+                then (do
+                    comma 
+                    rest <- commaSep parseExp 
+                    return $ ListSeq (start:rest))
+                else (do
+                    reservedOp ".."
+                    end <- parseExp
+                    return $ RangeSeq start end)
+            )
+          ) <|> (do 
           --traceM "parseExpNonCond.parseTermBase.IntLit"
           n <- parseInt
           return $ IntLit n
@@ -156,7 +210,6 @@ parseExpNonCond = buildExpressionParser table parseTerm
           ) <|> (do
           --traceM "parseExpNonCond.parseTermBase.StringLit"
           s <- parseString
-          --traceM $ "stringlit length: " ++ show (length s) ++ " " ++ show s
           return $ StringLit s
           ) <|> (do
           --traceM "parseExpNonCond.parseTermBase.Null"
@@ -190,17 +243,20 @@ parseExpNonCond = buildExpressionParser table parseTerm
           --traceM "parseExpNonCond.parseTermBase.parens"
           term <- parens parseExp
           return term
-          )
-
+          ) 
+       
+         
+        
         -- Parses all postfix operations from a term.
         parseTermPost :: Exp -> Parser Exp
         parseTermPost base = (do
           --traceM "parseExp.parseTermPost.Index"
           index <- brackets parseExp
           parseTermPost $ Index base index
-          ) <|> (do
+          ) <|> try (do
           --traceM "parseExp.parseTermPost.Dot"
           reservedOp "."
+          notFollowedBy $ reservedOp "."
           field <- identifier
           parseTermPost $ Dot base field
           ) <|> (do
@@ -331,21 +387,21 @@ parseType = (do
   where -- A type base does not contain any []'s or *'s.
         parseTypeBase :: Parser Common.Type
         parseTypeBase = (do
-          --traceM "parseTypeBase.IntT"
+          --traceM "parseTypeBase.IntT" or traceM "parseTypeBase.SeqT IntT"
           reserved "int"
-          return Common.IntT
+          parseTypeSeq Common.IntT 
           ) <|> (do
-          --traceM "parseTypeBase.CharT"
+          --traceM "parseTypeBase.CharT" or traceM "parseTypeBase.SeqT CharT"
           reserved "char"
-          return Common.CharT
+          parseTypeSeq Common.CharT
           ) <|> (do
-          --traceM "parseTypeBase.StringT"
+          --traceM "parseTypeBase.StringT" or traceM "parseTypeBase.SeqT StringT"
           reserved "string"
-          return Common.StringT
+          parseTypeSeq Common.StringT
           ) <|> (do
-          --traceM "parseTypeBase.BoolT"
+          --traceM "parseTypeBase.BoolT" or traceM "parseTypeBase.SeqT BoolT"
           reserved "bool"
-          return Common.BoolT
+          parseTypeSeq Common.BoolT
           ) <|> (do
           --traceM "parseTypeBase.VoidT"
           reserved "void"
@@ -373,6 +429,14 @@ parseType = (do
               else fail "No defined type with this ident"
           )
 
+        parseTypeSeq :: Common.Type -> Parser Common.Type 
+        parseTypeSeq t = try (do
+            reservedOp "<>"
+            return $ Common.SeqT t
+            ) <|> (do
+            return $ t
+            )
+
         -- Postfix type modifiers are []'s and *'s.
         parseTypePost :: Common.Type -> Parser Common.Type
         parseTypePost base = (do
@@ -394,3 +458,4 @@ parseType = (do
 -- Taken from \url{https://hackage.haskell.org/package/parsec-3.0.0/docs/Text-Parsec-Expr.html}
 binary  name fun assoc = Infix (do{ reservedOp name; return fun }) assoc
 prefix  name fun       = Prefix (do{ reservedOp name; return fun })
+suffix name fun       = Postfix (do{ reservedOp name; return fun })
