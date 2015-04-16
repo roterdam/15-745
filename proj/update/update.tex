@@ -59,13 +59,10 @@
 
 \begin{question}{Major Changes}
 There have been no major changes in our goals since the project proposal. 
-We have however realized that unlike in our proposal, we couldn't
-simply address the problem incrementally in three parts - coalescing 
-\code{map} operations, coalescing \code{map} and \code{reduce} operations and 
-coalescing \code{map} and \code{filter} operations - like we originally had 
-planned. Instead, we realized that we needed to consider all the operations 
-together while coming up with an algorithm to be able to coalesce operations 
-together. Therefore, our original plan has been modified slightly.
+We have however realized that the way we divided the optimization into parts -
+coalescing \code{map} operations, coalescing \code{map} and \code{reduce} operations and 
+coalescing \code{map} and \code{filter} operations - was not necessary, and we
+have modified our plan to account for that.
 \end{question}
 \begin{question}{What you have accomplished so far}
 We have formalized our implementation plans for this project by clearly
@@ -73,8 +70,8 @@ defining the grammar for the updated C0 language that we are designing. We have
 also written up typing rules and have come up with an initial dataflow pass to
 determine how far to delay executing \code{map}, \code{filter} and \code{reduce}
 operations - as a first step to being able to then coalesce operations together.
-We also currently have a fully functioning \code{C1} to C compiler which we have
-augmented to handle the additional constructs necessary for sequences. 
+We are most of the way to a fully functioning \code{C1} to C compiler, and will be in
+a position to start working on the optimizations within half a week. 
 \end{question}
 
 \begin{question}{Meeting your milestone}
@@ -94,12 +91,12 @@ There have been no major surprises in our tackling of the problem.
 \begin{tabular}{|p{8cm}|c|c|}
 \hline 
 Work to do & Deadline & Who \\ \hline
-Write a pass to determine how far down \code{map} and \code{filter} operations
-can be pushed down in the code path without modifying loops and conditionals &
+Write a pass over the AST to push \code{map} and \code{filter} operations as
+far down the program as possible in the straight-line-code case. &
 May 22nd & Rokhini \\ \hline
-Based on the pass above, modify the compiler to produce valid C code that has 
-lazy sequence evaluation & May 25th & Michael \\ \hline 
-Write a pass for code motion into loops and conditionals when valid & May 29th &
+Write a complementary pass, that coalesces adjacent sequence operations into
+single operations on new functions. & May 25th & Michael \\ \hline 
+Extend the above code to work for loops and conditionals. & May 29th &
 Michael and Rokhini \\ \hline
 Write the final report & May 2nd & Michael and Rokhini \\ \hline
 \end{tabular}
@@ -107,6 +104,6 @@ Write the final report & May 2nd & Michael and Rokhini \\ \hline
 \end{question}
 
 \begin{question}{Resources Needed}
-Yes we do. We don't require any other materials. 
+We have the resources we need, and don't require any other materials. 
 \end{question}
 \end{document}
