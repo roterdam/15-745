@@ -37,7 +37,7 @@ data Exp = IntLit Common.IntLit | BoolLit Bool | CharLit Char
          | Alloc Common.Type | AllocArray Common.Type Exp | Index Exp Exp 
          | Star Exp | Dot Exp Common.Ident | Amp Common.Ident 
          | Cast Common.Type Exp | Null
-         | Tabulate Exp Exp | ListSeq [Exp]  
+         | Tabulate Exp Exp | ListSeq [Exp] | RangeSeq Exp Exp
          | Map Exp Exp | Reduce Exp Exp Exp | Filter Exp Exp 
          | Combine Exp Exp Exp 
 
@@ -152,13 +152,13 @@ instance Show Exp where
   show Null = "NULL"
   show (Amp ident) = joinL ["&", ident]
   show (Cast t e) = joinL ["(", show t, ")(", show e, ")"]
-  show (Tabulate f e) = joinL ["tabulate ", show f, show e]
-  show (ListSeq elems) = joinL ["<", (foldl (\a b -> a ++ ", " ++ show b)
-                                 "" elems), ">"]
+  show (Tabulate f e) = joinL ["tabulate ", show f, " ", show e]
+  show (ListSeq elems) = joinL ["<", (foldl (\a b -> a ++ show b ++ ",") "" elems), ">"]
+  show (RangeSeq start end) = joinL ["<", show start, "..", show end, ">"] 
   show (Map f s) = joinL ["map ", show f, show s]
-  show (Reduce f b s) = joinL ["reduce ", show f,  show b, show s]
-  show (Filter p s) = joinL ["filter ", show p, show s]
-  show (Combine f a b) = joinL ["combine ", show f, show a, show b] 
+  show (Reduce f b s) = joinL ["reduce ", show f, " ", show b, " ", show s]
+  show (Filter p s) = joinL ["filter ", show p, " ", show s]
+  show (Combine f a b) = joinL ["combine ", show f, " ", show a, " ", show b] 
 
 instance Show LValue where
   show (LIdent ident) = ident

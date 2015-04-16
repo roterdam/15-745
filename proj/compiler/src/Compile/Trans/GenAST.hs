@@ -119,6 +119,13 @@ elabExp (PT.Dot struct ident) = AST.Dot (elabExp struct) ident
 elabExp PT.Null = AST.Null
 elabExp (PT.Amp ident) = AST.Amp ident
 elabExp (PT.Cast t e) = AST.Cast t $ elabExp e
+elabExp (PT.ListSeq s) = AST.ListSeq $ map elabExp s
+elabExp (PT.RangeSeq s e) = AST.RangeSeq (elabExp s) (elabExp e)
+elabExp (PT.Tabulate f n) = AST.Tabulate (elabExp f) (elabExp n)
+elabExp (PT.Map f s) = AST.Map (elabExp f) (elabExp s)
+elabExp (PT.Reduce f b s) = AST.Reduce (elabExp f) (elabExp b) (elabExp s)
+elabExp (PT.Filter pred s) = AST.Filter (elabExp pred) (elabExp s)
+elabExp (PT.Combine f a b) = AST.Combine (elabExp f) (elabExp a) (elabExp b)  
 
 -- Assumes that the input is not LOr or LAnd (which are elaborated seperately).
 elabBinop :: PT.Binop -> AST.Binop

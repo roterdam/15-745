@@ -10,6 +10,7 @@ module Compile.Parse.Tokens
 , operator
 , braces
 , parens
+, angles 
 , reservedOp
 , natural
 , hexadecimal
@@ -49,11 +50,12 @@ def = LanguageDef {
     opLetter        = oneOf "=&|<>",
     reservedNames   = ["struct", "typedef", "if", "else", "while", "for", "continue", "break",
                        "return", "assert", "true", "false", "NULL", "alloc", "alloc_array",
-                       "int", "bool", "void", "char", "string"],
+                       "int", "bool", "void", "char", "string", "tabulate", "map", 
+                       "reduce", "filter", "combine", "seq"],
     reservedOpNames = ["!", "~", "-", "+", "*", "/", "%", "<<", ">>",
                        "<", ">", ">=", "<=", "==", "!=", "&", "^", "|", "&&", "||",
                        "=", "+=", "-=", "*=", "/=", "%=", "<<=", ">>=", "&=", "|=", "^=",
-                       ":", "?", "++", "--", "[", "]", ".", "->"],
+                       ":", "?", "++", "--", "[", "]", ".", "->", ".."],
     caseSensitive   = True }
 
 lexer :: Tok.GenTokenParser StreamT StateT MonadT
@@ -73,6 +75,8 @@ braces        :: Parser a -> Parser a
 braces        = Tok.braces lexer
 parens        :: Parser a -> Parser a
 parens        = Tok.parens lexer
+angles        :: Parser a -> Parser a
+angles        = Tok.angles lexer
 reservedOp    :: String -> Parser ()
 reservedOp    = Tok.reservedOp lexer
 natural       :: Parser Integer

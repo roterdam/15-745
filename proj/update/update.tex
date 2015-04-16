@@ -1,0 +1,112 @@
+\documentclass[11pt]{article}
+\usepackage{enumerate}
+\usepackage{proof}
+\usepackage{latexsym}
+\usepackage{hyperref}
+\usepackage{tikz}
+\usepackage{fullpage}
+\usepackage{fancyhdr}
+\usepackage{graphicx}
+
+\usepackage{amsmath, amsfonts, amsthm, amssymb}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{5pt plus 1pt}
+\pagestyle{empty}
+
+\def\indented#1{\list{}{}\item[]}
+\let\indented=\endlist
+
+\newcounter{questionCounter}
+\newcounter{partCounter}[questionCounter]
+\newenvironment{question}[2][\arabic{questionCounter}]{%
+    \setcounter{partCounter}{0}%
+    \vspace{.25in} \hrule \vspace{0.5em}%
+        \noindent{\bf #2}%
+    \vspace{0.8em} \hrule \vspace{.10in}%
+    \addtocounter{questionCounter}{1}%
+}{}
+\renewenvironment{part}[1][\alph{partCounter}]{%
+    \addtocounter{partCounter}{1}%
+    \vspace{.10in}%
+    \begin{indented}%
+       {\bf (#1)} %
+}{\end{indented}}
+
+%%%%%%%%%%%%%%%%% Identifying Information %%%%%%%%%%%%%%%%%
+%% This is here, so that you can make your homework look %%
+%% pretty when you compile it.                           %%
+%%     DO NOT PUT YOUR NAME ANYWHERE ELSE!!!!            %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\newcommand{\myname}{Michael Choquette, Rokhini Prabhu}
+\newcommand{\myandrew}{mchoquet, rokhinip}
+\newcommand{\projectname}{Proposal Update} 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{document}
+\thispagestyle{plain}
+
+\begin{center}
+{\Large \projectname} \\
+\myname \\
+\myandrew \\
+\today
+\end{center}
+
+\newcommand{\nonterm}[1]{$\langle${#1}$\rangle$}
+\newcommand{\OR}{\ensuremath{\ | \ \ }}
+\newcommand{\term}[1]{\textbf{#1}}
+\newcommand{\code}[1]{\texttt{#1}}
+
+\begin{question}{Major Changes}
+There have been no major changes in our goals since the project proposal. 
+We have however realized that unlike in our proposal, we couldn't
+simply address the problem incrementally in three parts - coalescing 
+\code{map} operations, coalescing \code{map} and \code{reduce} operations and 
+coalescing \code{map} and \code{filter} operations - like we originally had 
+planned. Instead, we realized that we needed to consider all the operations 
+together while coming up with an algorithm to be able to coalesce operations 
+together. Therefore, our original plan has been modified slightly.
+\end{question}
+\begin{question}{What you have accomplished so far}
+We have formalized our implementation plans for this project by clearly
+defining the grammar for the updated C0 language that we are designing. We have
+also written up typing rules and have come up with an initial dataflow pass to
+determine how far to delay executing \code{map}, \code{filter} and \code{reduce}
+operations - as a first step to being able to then coalesce operations together.
+We also currently have a fully functioning \code{C1} to C compiler which we have
+augmented to handle the additional constructs necessary for sequences. 
+\end{question}
+
+\begin{question}{Meeting your milestone}
+We have fallen behind on our goal of being able to coaslece consecutive
+\code{map} operations. This has been because of two reasons - firstly we 
+restructured our implementation plans and seconldy because we have not 
+been able to put in as much time as we wanted to into this project due to 
+other unexpectedly pressing matters which came up.
+\end{question}
+
+\begin{question}{Surprises}
+There have been no major surprises in our tackling of the problem. 
+\end{question}
+
+\begin{question}{Revised Schedule}
+\begin{center}
+\begin{tabular}{|p{8cm}|c|c|}
+\hline 
+Work to do & Deadline & Who \\ \hline
+Write a pass to determine how far down \code{map} and \code{filter} operations
+can be pushed down in the code path without modifying loops and conditionals &
+May 22nd & Rokhini \\ \hline
+Based on the pass above, modify the compiler to produce valid C code that has 
+lazy sequence evaluation & May 25th & Michael \\ \hline 
+Write a pass for code motion into loops and conditionals when valid & May 29th &
+Michael and Rokhini \\ \hline
+Write the final report & May 2nd & Michael and Rokhini \\ \hline
+\end{tabular}
+\end{center}
+\end{question}
+
+\begin{question}{Resources Needed}
+Yes we do. We don't require any other materials. 
+\end{question}
+\end{document}
