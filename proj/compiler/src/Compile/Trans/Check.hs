@@ -17,7 +17,7 @@
           information built during the pre-processing step, this infromation is position-dependent.
           For instance, what functions have been declared *so far*?
         - FnState: Information about what constructs have been defined/declared in the current
-          function. This informatio is position-dependent, and is thrown out whenever we leave the
+          function. This information is position-dependent, and is thrown out whenever we leave the
           function.
 -}
 
@@ -509,6 +509,159 @@ checkExp (fns, gs) e = do
             (PtrC Any,          PtrC (One VoidC))   -> return toConc
             (PtrC Any,          PtrC (One _))       -> throwError $ errPrefix "cannot untag NULL"
             _ -> throwError $ errPrefix "Invalid source or destination type"
+        checkExp' (fns, gs) (Tabulate fExp nExp) = do
+          {-
+            Tabulate is valid iff:
+            --> F is a valid sequence function (pure, as well as not a fn ptr)
+            --> The function argument list is [CInt].
+            --> The function return type is CInt or CBool.
+            --> The type of nExp is CInt.
+          -}
+          let errPrefix = CheckErr "tabulate" $ show fExp ++ ", " ++ show nExp
+          f <- getSeqFn (fns, gs) fExp errPrefix
+          sig <- lookupSigFromIdent gs f
+          let (cRet, cExpectedArgs) = sig
+          throwIf (argListsDiffer gs cExpectedArgs [IntC]) $ errPrefix "parameter types do not match expected"
+          throwIf (badSeqElemType cRet) $ errPrefix "return type not valid for sequences"
+          cArg <- checkExp (fns, gs) nExp
+          throwIf (cNeq gs cArg IntC) $ errPrefix "argument type does not match signature"
+          return $ SeqC cRet
+        checkExp' (fns, gs) (ListSeq es) = do
+          {-
+            Sequence literal is valid iff:
+            --> Nonempty.
+            --> All elements same type.
+            --> All elements either IntC or BoolC.
+          -}
+          let errPrefix = CheckErr "litSeq" ""
+          eCs <- mapM (checkExp (fns, gs)) es
+          headC <- case eCs of
+            [] -> throwError $ errPrefix "sequence literal cannot be empty"
+            (c1:_) -> do
+              throwIf (badSeqElemType c1) $ errPrefix "element type not valid for sequences"
+              return c1
+          throwIf (argListsDiffer gs eCs (replicate (length eCs) headC)) $ errPrefix "all elements must be the same type"
+          return $ SeqC headC
+        checkExp' (fns, gs) (Map fExp seqExp) = do
+          {-
+            Map is valid iff:
+            --> F is a valid sequence function (pure, as well as not a fn ptr)
+            --> F takes a single argument.
+            --> seqExp is a valid sequence.
+            --> The type of f's argument is the element type of seqExp
+            --> f returns a valid seq type.
+          -}
+          let errPrefix = CheckErr "map" $ show fExp
+          f <- getSeqFn (fns, gs) fExp errPrefix
+          sig <- lookupSigFromIdent gs f
+          let (cRet, cExpectedArgs) = sig
+          argC <- checkExp (fns, gs) seqExp
+          argElemC <- case argC of
+            (SeqC c) -> return c
+            _ -> throwError $ errPrefix "input argument isn't a sequence"
+          throwIf (argListsDiffer gs cExpectedArgs [argElemC]) $ errPrefix "function signature doesn't match argument"
+          throwIf (badSeqElemType cRet) $ errPrefix "map function must return a valid sequence element type"
+          return $ SeqC cRet
+        checkExp' (fns, gs) (Reduce fExp baseExp seqExp) = do
+          {-
+            Reduce is valid iff:
+            --> F is a valid sequence function (pure, as well as not a fn ptr).
+            --> F takes two arguments.
+            --> seqExp is a valid sequence.
+            --> The type of f's arguments are the same as the element type of
+                seqExp.
+            --> F returns the same type as its input arguments.
+          -}
+          let errPrefix = CheckErr "reduce" $ show fExp ++ ", " ++ show baseExp
+          f <- getSeqFn (fns, gs) fExp errPrefix
+          sig <- lookupSigFromIdent gs f
+          let (cRet, cExpectedArgs) = sig
+          seqC <- checkExp (fns, gs) seqExp
+          throwIf (argListsDiffer gs cExpectedArgs [seqC, seqC]) $ errPrefix "function signature doesn't match input sequence"
+          throwIf (cNeq gs seqC cRet) $ errPrefix "return type different from input types"
+          return $ SeqC cRet
+        checkExp' (fns, gs) (Filter fExp seqExp) = do
+          {-
+            Filter is valid iff:
+            --> F is a valid sequence function (pure, as well as not a fn ptr).
+            --> F takes one argument.
+            --> seqExp is a valid sequence.
+            --> The type of f's argument is the same as the element type of
+                seqExp.
+            --> The output type of f is BoolC.
+          -}
+          let errPrefix = CheckErr "filter" $ show fExp
+          f <- getSeqFn (fns, gs) fExp errPrefix
+          sig <- lookupSigFromIdent gs f
+          let (cRet, cExpectedArgs) = sig
+          seqC <- checkExp (fns, gs) seqExp
+          throwIf (argListsDiffer gs cExpectedArgs [seqC]) $ errPrefix "function signature doesn't match input sequence"
+          throwIf (cNeq gs BoolC cRet) $ errPrefix "return type must be bool"
+          return $ SeqC seqC
+        checkExp' (fns, gs) (Combine fExp seqExp1 seqExp2) = do
+          {-
+            Combine is valid iff:
+            --> seqExp1 and seqExp2 are valid sequences with element types cSeq1
+                and cSeq2.
+            --> F is a valid sequence funtion (pure, as well as not a fn ptr).
+            --> F's type is (cSeq1, cSeq2) -> c3, where c3 is a valid sequence
+                element type.
+          -}
+          let errPrefix = CheckErr "combine" $ show fExp
+          seqC1 <- checkExp (fns, gs) seqExp1
+          seqC2 <- checkExp (fns, gs) seqExp2
+          f <- getSeqFn (fns, gs) fExp errPrefix
+          sig <- lookupSigFromIdent gs f
+          let (cRet, cExpectedArgs) = sig
+          throwIf (argListsDiffer gs cExpectedArgs [seqC1, seqC2]) $ errPrefix "function signature doesn't match input sequences"
+          throwIf (badSeqElemType cRet) $ errPrefix "return type must be a valid sequence element type"
+          return $ SeqC cRet
+
+        getSeqFn :: (FnState, GlobalState) -> Exp -> (String -> CheckErr) -> CheckMonad Common.Ident
+        getSeqFn (fns, gs) (Ident f) errPrefix = do
+          throwIf (Map.member f $ declared fns) $ errPrefix "function defined, but shadowed"
+          throwIf (notPure gs f) $ errPrefix "function used in sequence operations must be pure"
+          return f
+        getSeqFn _ _ errPrefix =
+          throwError $ errPrefix "function pointers disallowed for sequences"
+          
+
+        argListsDiffer :: GlobalState -> [Conc] -> [Conc] -> Bool
+        argListsDiffer gs a1 a2 =
+          (length a1 /= length a2) || (or $ zipWith (cNeq gs) a1 a2)
+
+        badSeqElemType :: Conc -> Bool
+        badSeqElemType IntC = False
+        badSeqElemType BoolC = False
+        badSeqElemType _ = True
+
+        notPure :: GlobalState -> Common.Ident -> Bool
+        notPure = error "purity checking unimplemented"
+
+{-
+        checkExp' (fns, gs) (Call e args) = do
+          let errPrefix = CheckErr "function call" $ show e
+          sig <- case e of
+            Ident ident -> do
+              throwIf (Map.member ident $ declared fns) $ errPrefix "function defined, but shadowed"
+              lookupSigFromIdent gs ident
+            _ -> do
+              conc <- checkExp (fns, gs) e
+              case conc of
+                FnC ident -> lookupSigFromType gs ident
+                _ -> throwError $ errPrefix "cannot call a non-function"
+          let (concRetT, concExpectedArgs) = sig
+          concActualArgs <- mapM (checkExp (fns, gs)) args
+          let badArgs = (or $ zipWith (cNeq gs) concActualArgs concExpectedArgs) || length concActualArgs /= length concExpectedArgs
+          throwIf badArgs $ errPrefix "argument types do not match signature"
+          return concRetT
+-}
+
+
+
+
+
+
 
 {-
   Checks the value pointed to by a pointer.
@@ -559,6 +712,12 @@ checkBinop gs binop =
           throwIf (cNeq gs expectedIn1 actualIn1 || cNeq gs expectedIn2 actualIn2) $ errPrefix "invalid operand types"
           return out
 
+        seqChecker :: (Conc, Conc) -> CheckMonad Conc
+        seqChecker (SeqC conc1, SeqC conc2) = do
+          throwIf (cNeq gs conc1 conc2) $ errPrefix "unequal sequence types"
+          return $ BoolC
+        seqChecker _ = throwError $ errPrefix "invalid operand types"
+        
         arrChecker :: (Conc, Conc) -> CheckMonad Conc
         arrChecker (ArrC conc1, ArrC conc2) = do
           throwIf (cNeq gs conc1 conc2) $ errPrefix "unequal array types"
@@ -580,6 +739,7 @@ checkBinop gs binop =
         eqNeqChecker = compoundOpChecker [  basicOpChecker (BoolC, BoolC) BoolC ,
                                             basicOpChecker (IntC,  IntC ) BoolC ,
                                             basicOpChecker (CharC, CharC) BoolC ,
+                                            seqChecker                          ,
                                             arrChecker                          ,
                                             ptrChecker                          ]
 
@@ -612,6 +772,11 @@ getConcrete gs (Common.ArrT t) = do
   if cNeq gs conc VoidC
     then return $ ArrC conc
     else throwError $ CheckErr "type" (show $ Common.ArrT t) "cannot have a void[]"
+getConcrete gs (Common.SeqT t) = do
+  conc <- getConcrete gs t
+  if (cEq gs conc BoolC || cEq gs conc IntC)
+    then return $ SeqC conc
+    else throwError $ CheckErr "type" (show t) "invalid for sequences: only int and bool are allowed"
 getConcrete gs (Common.PtrT t) = do
   conc <- getConcrete gs t
   return $ PtrC $ One conc

@@ -23,7 +23,7 @@ data GDecl = Typedef Common.Type Common.Ident
            | FDefn Common.Type Common.Ident [Common.Param] [Stmt]
            | SDefn Common.Ident [Common.Param]
 
--- A statement. Note that we separate declaration and assignment for easier 
+-- A statement. Note that we separate declaration and assignment for easier
 -- typechecking.
 data Stmt = Assn Common.Asop LValue Exp | If Exp [Stmt] [Stmt] 
           | While Exp [Stmt] | Return (Maybe Exp) 

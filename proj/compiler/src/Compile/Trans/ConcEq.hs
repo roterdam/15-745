@@ -14,6 +14,7 @@ cEq gs c1 c2 =
   case (c1, c2) of
     (PtrC p1, PtrC p2) -> pEq gs p1 p2
     (ArrC c1, ArrC c2) -> cEq gs c1 c2
+    (SeqC c1, SeqC c2) -> cEq gs c1 c2
     (StructC i1, StructC i2) -> i1 == i2
     (FnC i1, FnC i2) -> i1 == i2
     (VoidC, VoidC) -> True
@@ -44,7 +45,7 @@ pEq gs p1 p2 =
 
 -- Determines whether two concs are not equal.
 cNeq :: GlobalState -> Conc -> Conc -> Bool
-cNeq gs c1 c2 = not $ cEq gs c1 c2
+cNeq gs conc1 conc2 = not $ cEq gs conc1 conc2
 
 -- Determines whether two concrete sigs are equal.
 cSigEq :: GlobalState -> CSig -> CSig -> Bool

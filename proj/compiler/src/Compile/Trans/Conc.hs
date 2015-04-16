@@ -20,8 +20,9 @@ type CSig = (Conc, [Conc])
 -- NOTE: This can only construct valid types.
 -- TODO: actually, the NOTE isn't true...ideally, it would be.
 -- But currently, we can construct void[], which isn't valid.
+-- ALSO: only sequences of ints and bools are allowed.
 data Conc = ArrC Conc | PtrC Pointed | StructC Common.Ident | FnC Common.Ident
-          | VoidC | BoolC | IntC | CharC | StringC deriving (Eq, Ord)
+          | VoidC | BoolC | IntC | CharC | StringC | SeqC Conc deriving (Eq, Ord)
 
 -- Concs that we can have a pointer to, as well as some intermediate states needed by the check.
 -- NOTE: Any refers to the type of the value referenced by a NULL pointer,
@@ -33,6 +34,7 @@ instance Show CParam where
 
 instance Show Conc where
   show (ArrC conc) = show conc ++ "[]"
+  show (SeqC conc) = show conc ++ "<>"
   show (PtrC pointed) = show pointed ++ "*"
   show (StructC ident) = "struct " ++ ident
   show (FnC ident) = "fn " ++ ident

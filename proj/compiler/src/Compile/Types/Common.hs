@@ -115,7 +115,7 @@ instance Show Cmp where
 
 -- A Type.
 data Type = DefT Ident | StructT Ident | FnT Ident | ArrT Type | PtrT Type
-          | IntT | BoolT | VoidT | CharT | StringT deriving Eq
+          | SeqT Type | IntT | BoolT | VoidT | CharT | StringT deriving Eq
 instance Show Type where
   show IntT = "int"
   show BoolT = "bool"
@@ -127,6 +127,7 @@ instance Show Type where
   show (FnT ident) = ident
   show (PtrT t) = show t ++ "*"
   show (ArrT t) = show t ++ "[]"
+  show (SeqT t) = show t ++ "<>"
 
 -- A (type, ident) pair.
 data Param = Param {

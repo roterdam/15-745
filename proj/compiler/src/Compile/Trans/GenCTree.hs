@@ -1,24 +1,174 @@
 {-
-  Converts ASTs into CTrees.
+  Converts ASTs into CTrees. Relevant changes are:
+  --> types are translated:
+      --> arrays are turned into pointers.
+      --> strings are turned into Char *s.
+  --> alloc and alloc_array are turned into calloc.
+  --> The distinction between external and local declarations is removed.
+  TO ADD:
+  --> sequences are mapped to pointers to structs with arrays and size.
+  --> tabulate, map, reduce, filter, and combine are mapped to special functions
+      that are added to the program as GDecls.
+  --> sequence literals are mapped to a custom block of code that inlines the
+      creation of the sequence.
+
+  PROBLEM: The sequence library functions all take a function as their first
+           argument, but C function pointers are kind of hard to work with since
+           you have no optimization info. I see two possible options:
+           1. Use function pointers anyway. This is easiest to do right now, and
+              I THOUGHT it wouldn't work out later r.e. optimizations, but now
+              it occurs to me that all optimizations occur before this point so
+              it's probably ok.
+           2. Make a clone of each map/tabulate/reduce/whatever, for each
+              function that's passed in to it. This would generate
+              higher-quality code b/c it would allow for inlining, but would
+              also be more complicated to write. The problem is, I'm pretty sure
+              the overhead of calling a function pointer (and making inlining
+              harder) makes it much harder to get any observable speedups from
+              locality, so we'll probably eventually HAVE to do this.
+  How would I implement option 2?
+  --> loop through the program once to compute:
+      --> what types of sequences are used.
+      --> for each sequence operator, a list of all the functions it is called
+          with.
+  --> Build the 
 -}
 
 module Compile.Trans.GenCTree where
 
+import Compile.Trans.LibSeq
+import qualified Compile.Trans.Conc as Conc
 import qualified Compile.Types.Common as Common
 import qualified Compile.Types.AST as AST
 import qualified Compile.Types.CTree as CTree
 import qualified Job as Job
+import Compile.Trans.CheckState (GlobalState(..))
+
+import qualified Data.Map as Map
 
 assertFnName :: String
 assertFnName = "assert"
 callocFnName :: String
 callocFnName = "calloc"
 
-stdIncludes :: [CTree.GDecl]
-stdIncludes = [CTree.Include "<stdlib.h>", CTree.Include "<stdbool.h>"]
 
-astToCTree :: Job.Job -> AST.AST -> CTree.CTree
-astToCTree _ (AST.Prog gs) = CTree.Prog $ stdIncludes ++ (map transGDecl gs)
+
+astToCTree :: GlobalState -> AST.AST -> CTree.CTree
+astToCTree gs (AST.Prog gDecls) =
+  let seqInfo = getSeqInfo gDecls
+      seqIncludes = getSeqIncludes seqInfo
+  in  CTree.Prog $ stdIncludes ++ seqIncludes ++ (map transGDecl gDecls)
+  where stdIncludes :: [CTree.GDecl]
+        stdIncludes = [CTree.Include "<stdlib.h>", CTree.Include "<stdbool.h>"]
+
+        getSeqInfo :: [AST.GDecl] -> SeqInfo
+        getSeqInfo = foldl addFromGDecl emptySeqInfo
+
+        addFromGDecl :: SeqInfo -> AST.GDecl -> SeqInfo
+        addFromGDecl si (AST.Typedef t _) = addFromType t si
+        addFromGDecl si (AST.Sigdef t _ params) =
+          addFromParams params $ addFromType t si
+        addFromGDecl si (AST.FDecl t _ params) =
+          addFromParams params $ addFromType t si
+        addFromGDecl si (AST.FExt t _ params) =
+          addFromParams params $ addFromType t si
+        addFromGDecl si (AST.FDefn t _ params stmts) =
+          addFromStmts (addFromParams params $ addFromType t si) stmts
+        addFromGDecl si (AST.SDefn _ params) = addFromParams params si
+
+        addFromParams :: [Common.Param] -> SeqInfo -> SeqInfo
+        addFromParams params si = foldl addFromParam si params
+
+        addFromParam :: SeqInfo -> Common.Param -> SeqInfo
+        addFromParam si (Common.Param t _) = addFromType t si
+
+        addFromStmts :: SeqInfo -> [AST.Stmt] -> SeqInfo
+        addFromStmts = foldl addFromStmt
+
+        addFromStmt :: SeqInfo -> AST.Stmt -> SeqInfo
+        addFromStmt si (AST.Assn _ lv e) = addFromExp e $ addFromLValue lv si
+        addFromStmt si (AST.If e tStmts fStmts) =
+          addFromStmts (addFromStmts (addFromExp e si) tStmts) fStmts
+        addFromStmt si (AST.While e stmts) =
+          addFromStmts (addFromExp e si) stmts
+        addFromStmt si (AST.Return eOpt) = addFromEOpt eOpt si
+        addFromStmt si (AST.Decl t v eOpt stmts) =
+          addFromStmts (addFromEOpt eOpt $ addFromType t si) stmts
+        addFromStmt si (AST.Assert e) = addFromExp e si
+        addFromStmt si (AST.Exp e) = addFromExp e si
+
+        addFromExp :: AST.Exp -> SeqInfo -> SeqInfo
+        addFromExp (AST.IntLit _) si = si
+        addFromExp (AST.BoolLit _) si = si
+        addFromExp (AST.CharLit _) si = si
+        addFromExp (AST.StringLit _) si = si
+        addFromExp (AST.Ident _) si = si
+        addFromExp (AST.Binop _ e1 e2) si = addFromExp e1 $ addFromExp e2 si
+        addFromExp (AST.Unop _ e) si = addFromExp e si
+        addFromExp (AST.Cond e1 e2 e3) si =
+          addFromExp e1 $ addFromExp e2 $ addFromExp e3 si
+        addFromExp (AST.Call e es) si =
+          addFromExp e $ foldr addFromExp si es
+        addFromExp (AST.Alloc _) si = si
+        addFromExp (AST.AllocArray _ e) si = addFromExp e si
+        addFromExp (AST.Index e1 e2) si = addFromExp e1 $ addFromExp e2 si
+        addFromExp (AST.Star e) si = addFromExp e si
+        addFromExp (AST.Dot e _) si = addFromExp e si
+        addFromExp (AST.Amp _) si = si
+        addFromExp (AST.Cast _ e) si = addFromExp e si
+        addFromExp (AST.Null) si = si
+        addFromExp (AST.Tabulate (AST.Ident f) e) si =
+          let si' = addFromExp e si
+              (_, (retC, _)) = (fnSigs gs) Map.! f
+          in addTabulateCall si' f retC
+        addFromExp (AST.ListSeq es) si = error "unimplemented"
+        addFromExp (AST.Map (AST.Ident f) e) si =
+          let si' = addFromExp e si
+              (_, (retC, [paramC])) = (fnSigs gs) Map.! f
+          in addMapCall si' f retC paramC
+        addFromExp (AST.Reduce (AST.Ident f) e1 e2) si =
+          let si' = addFromExp e1 $ addFromExp e2 si
+              (_, (retC, _)) = (fnSigs gs) Map.! f
+          in addReduceCall si' f retC
+        addFromExp (AST.Filter (AST.Ident f) e) si =
+          let si' = addFromExp e si
+              (_, (_, [argC])) = (fnSigs gs) Map.! f
+          in addFilterCall si' f argC
+        addFromExp (AST.Combine (AST.Ident f) e1 e2) si =
+          let si' = addFromExp e1 $ addFromExp e2 si
+              (_, (retC, [arg1C, arg2C])) = (fnSigs gs) Map.! f
+          in addCombineCall si' f retC arg1C arg2C
+
+        addFromLValue :: AST.LValue -> SeqInfo -> SeqInfo
+        addFromLValue (AST.LIdent _) si = si
+        addFromLValue (AST.LStar lv) si = addFromLValue lv si
+        addFromLValue (AST.LDot lv _) si = addFromLValue lv si
+        addFromLValue (AST.LIndex lv e) si = addFromLValue lv $ addFromExp e si
+
+        addFromEOpt :: (Maybe AST.Exp) -> SeqInfo -> SeqInfo
+        addFromEOpt Nothing si = si
+        addFromEOpt (Just e) si = addFromExp e si
+
+        addFromType :: Common.Type -> SeqInfo -> SeqInfo
+        addFromType t si =
+          case (getConcrete t) of
+            (Conc.SeqC c) -> addSeqType si c
+            _ -> si
+
+        getConcrete :: Common.Type -> Conc.Conc
+        getConcrete Common.VoidT = Conc.VoidC
+        getConcrete Common.StringT = Conc.StringC
+        getConcrete Common.CharT = Conc.CharC
+        getConcrete Common.IntT = Conc.IntC
+        getConcrete Common.BoolT = Conc.BoolC
+        getConcrete (Common.StructT ident) = Conc.StructC ident
+        getConcrete (Common.FnT ident) = Conc.FnC ident
+        getConcrete (Common.ArrT t) = Conc.ArrC $ getConcrete t
+        getConcrete (Common.SeqT t) = Conc.SeqC $ getConcrete t
+        getConcrete (Common.PtrT t) = Conc.PtrC $ Conc.One $ getConcrete t
+        getConcrete (Common.DefT ident) = (typedefs gs) Map.! ident
+
+
 
 transGDecl :: AST.GDecl -> CTree.GDecl
 transGDecl (AST.Typedef t ident) =

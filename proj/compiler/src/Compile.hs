@@ -19,6 +19,6 @@ compile job = do
   case fmt job of
     C0 ->       writeResult pt
     AST ->      writeResult ast
-    C ->        writeResult $ astToCTree job ast
+    C ->        writeResult $ astToCTree gs ast
   where writeResult :: (Show s) => s -> IO ()
         writeResult = writeFile (dest job) . show
