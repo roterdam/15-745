@@ -11,32 +11,11 @@
       that are added to the program as GDecls.
   --> sequence literals are mapped to a custom block of code that inlines the
       creation of the sequence.
-
-  PROBLEM: The sequence library functions all take a function as their first
-           argument, but C function pointers are kind of hard to work with since
-           you have no optimization info. I see two possible options:
-           1. Use function pointers anyway. This is easiest to do right now, and
-              I THOUGHT it wouldn't work out later r.e. optimizations, but now
-              it occurs to me that all optimizations occur before this point so
-              it's probably ok.
-           2. Make a clone of each map/tabulate/reduce/whatever, for each
-              function that's passed in to it. This would generate
-              higher-quality code b/c it would allow for inlining, but would
-              also be more complicated to write. The problem is, I'm pretty sure
-              the overhead of calling a function pointer (and making inlining
-              harder) makes it much harder to get any observable speedups from
-              locality, so we'll probably eventually HAVE to do this.
-  How would I implement option 2?
-  --> loop through the program once to compute:
-      --> what types of sequences are used.
-      --> for each sequence operator, a list of all the functions it is called
-          with.
-  --> Build the 
 -}
 
 module Compile.Trans.GenCTree where
 
-import Compile.Trans.LibSeq
+import Compile.Trans.ElabSeq
 import qualified Compile.Trans.Conc as Conc
 import qualified Compile.Types.Common as Common
 import qualified Compile.Types.AST as AST
@@ -56,10 +35,13 @@ callocFnName = "calloc"
 astToCTree :: GlobalState -> AST.AST -> CTree.CTree
 astToCTree gs (AST.Prog gDecls) =
   let seqInfo = getSeqInfo gDecls
-      seqIncludes = getSeqIncludes seqInfo
-  in  CTree.Prog $ stdIncludes ++ seqIncludes ++ (map transGDecl gDecls)
+  in  CTree.Prog $ concat [stdIncludes,
+                           getSeqDecls seqInfo,
+                           map transGDecl gDecls,
+                           getSeqDefns seqInfo]
   where stdIncludes :: [CTree.GDecl]
-        stdIncludes = [CTree.Include "<stdlib.h>", CTree.Include "<stdbool.h>"]
+        stdIncludes = [CTree.Include "<stdlib.h>", CTree.Include "<stdbool.h>",
+                       CTree.Include "<assert.h>"]
 
         getSeqInfo :: [AST.GDecl] -> SeqInfo
         getSeqInfo = foldl addFromGDecl emptySeqInfo
@@ -231,6 +213,18 @@ transExp (AST.Dot e ident) = CTree.Dot (transExp e) ident
 transExp (AST.Amp ident) = CTree.Amp ident
 transExp (AST.Cast t e) = CTree.Cast (transType t) (transExp e)
 transExp (AST.Null) = CTree.Null
+transExp (AST.ListSeq _) = error "unimplemented"
+transExp (AST.RangeSeq _ _) = error "unimplemented"
+transExp (AST.Tabulate (AST.Ident fName) e) =
+  CTree.Call (CTree.Ident $ libFnName "tabulate" fName) [transExp e]
+transExp (AST.Map (AST.Ident fName) e) =
+  CTree.Call (CTree.Ident $ libFnName "map" fName) [transExp e]
+transExp (AST.Reduce (AST.Ident fName) e1 e2) =
+  CTree.Call (CTree.Ident $ libFnName "reduce" fName) [transExp e1, transExp e2]
+transExp (AST.Filter (AST.Ident fName) e) =
+  CTree.Call (CTree.Ident $ libFnName "filter" fName) [transExp e]
+transExp (AST.Combine (AST.Ident fName) e1 e2) =
+  CTree.Call (CTree.Ident $ libFnName "combine" fName) [transExp e1, transExp e2]
 
 transBinop :: AST.Binop -> CTree.Binop
 transBinop (AST.ArithOp op) = CTree.ArithOp op
@@ -251,3 +245,7 @@ transType (Common.BoolT) = CTree.CBoolT
 transType (Common.VoidT) = CTree.CVoidT
 transType (Common.CharT) = CTree.CCharT
 transType (Common.StringT) = CTree.CPtrT CTree.CCharT
+transType (Common.SeqT Common.BoolT) =
+  CTree.CPtrT $ CTree.CDefT $ seqTypeName Conc.BoolC
+transType (Common.SeqT Common.IntT) =
+  CTree.CPtrT $ CTree.CDefT $ seqTypeName Conc.IntC

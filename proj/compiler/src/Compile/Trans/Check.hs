@@ -555,11 +555,9 @@ checkExp (fns, gs) e = do
           f <- getSeqFn (fns, gs) fExp errPrefix
           sig <- lookupSigFromIdent gs f
           let (cRet, cExpectedArgs) = sig
-          argC <- checkExp (fns, gs) seqExp
-          argElemC <- case argC of
-            (SeqC c) -> return c
-            _ -> throwError $ errPrefix "input argument isn't a sequence"
-          throwIf (argListsDiffer gs cExpectedArgs [argElemC]) $ errPrefix "function signature doesn't match argument"
+          seqC <- checkExp (fns, gs) seqExp
+          let SeqC elemC = seqC
+          throwIf (argListsDiffer gs cExpectedArgs [elemC]) $ errPrefix "function signature doesn't match argument"
           throwIf (badSeqElemType cRet) $ errPrefix "map function must return a valid sequence element type"
           return $ SeqC cRet
         checkExp' (fns, gs) (Reduce fExp baseExp seqExp) = do
@@ -577,9 +575,10 @@ checkExp (fns, gs) e = do
           sig <- lookupSigFromIdent gs f
           let (cRet, cExpectedArgs) = sig
           seqC <- checkExp (fns, gs) seqExp
-          throwIf (argListsDiffer gs cExpectedArgs [seqC, seqC]) $ errPrefix "function signature doesn't match input sequence"
-          throwIf (cNeq gs seqC cRet) $ errPrefix "return type different from input types"
-          return $ SeqC cRet
+          let SeqC elemC = seqC
+          throwIf (argListsDiffer gs cExpectedArgs [elemC, elemC]) $ errPrefix "function signature doesn't match input sequence"
+          throwIf (cNeq gs elemC cRet) $ errPrefix "return type different from input types"
+          return elemC
         checkExp' (fns, gs) (Filter fExp seqExp) = do
           {-
             Filter is valid iff:
@@ -595,9 +594,10 @@ checkExp (fns, gs) e = do
           sig <- lookupSigFromIdent gs f
           let (cRet, cExpectedArgs) = sig
           seqC <- checkExp (fns, gs) seqExp
-          throwIf (argListsDiffer gs cExpectedArgs [seqC]) $ errPrefix "function signature doesn't match input sequence"
+          let SeqC elemC = seqC
+          throwIf (argListsDiffer gs cExpectedArgs [elemC]) $ errPrefix "function signature doesn't match input sequence"
           throwIf (cNeq gs BoolC cRet) $ errPrefix "return type must be bool"
-          return $ SeqC seqC
+          return seqC
         checkExp' (fns, gs) (Combine fExp seqExp1 seqExp2) = do
           {-
             Combine is valid iff:
@@ -610,10 +610,13 @@ checkExp (fns, gs) e = do
           let errPrefix = CheckErr "combine" $ show fExp
           seqC1 <- checkExp (fns, gs) seqExp1
           seqC2 <- checkExp (fns, gs) seqExp2
+          let SeqC elemC1 = seqC1
+          let SeqC elemC2 = seqC2
           f <- getSeqFn (fns, gs) fExp errPrefix
           sig <- lookupSigFromIdent gs f
           let (cRet, cExpectedArgs) = sig
-          throwIf (argListsDiffer gs cExpectedArgs [seqC1, seqC2]) $ errPrefix "function signature doesn't match input sequences"
+          -- TODO: seqC1 and seqC2 should be elem types, right now they're CSeqs
+          throwIf (argListsDiffer gs cExpectedArgs [elemC1, elemC2]) $ errPrefix "function signature doesn't match input sequences"
           throwIf (badSeqElemType cRet) $ errPrefix "return type must be a valid sequence element type"
           return $ SeqC cRet
 
@@ -636,30 +639,7 @@ checkExp (fns, gs) e = do
         badSeqElemType _ = True
 
         notPure :: GlobalState -> Common.Ident -> Bool
-        notPure = error "purity checking unimplemented"
-
-{-
-        checkExp' (fns, gs) (Call e args) = do
-          let errPrefix = CheckErr "function call" $ show e
-          sig <- case e of
-            Ident ident -> do
-              throwIf (Map.member ident $ declared fns) $ errPrefix "function defined, but shadowed"
-              lookupSigFromIdent gs ident
-            _ -> do
-              conc <- checkExp (fns, gs) e
-              case conc of
-                FnC ident -> lookupSigFromType gs ident
-                _ -> throwError $ errPrefix "cannot call a non-function"
-          let (concRetT, concExpectedArgs) = sig
-          concActualArgs <- mapM (checkExp (fns, gs)) args
-          let badArgs = (or $ zipWith (cNeq gs) concActualArgs concExpectedArgs) || length concActualArgs /= length concExpectedArgs
-          throwIf badArgs $ errPrefix "argument types do not match signature"
-          return concRetT
--}
-
-
-
-
+        notPure _ _ = False {-error "purity checking unimplemented"-}
 
 
 
