@@ -10,18 +10,13 @@ int add(int a, int b){
     return a+b;
 }
 
-int id(int i) {
-  return i;
-}
-
 int main() {
   int<> A = tabulate A_constr 10000;
   int<> B = tabulate B_constr 10000;
 
   int<> C = combine add A B;
 
-  int<> D = tabulate id 10000;
-  //int<> D = seq(1..10000);
+  int<> D = seq(1..10000);
   
   return add(reduce add 0 C, reduce add 0 D);
 }

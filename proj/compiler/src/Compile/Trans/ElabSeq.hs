@@ -13,6 +13,7 @@ import qualified Data.Set as Set
 {-
   Contains:
     list of element types used in sequences.
+    whether or not any range-seqs are generated.
     list of (fnName, retType) used in tabulate calls.
     list of (fnName, inType, outType) used in map calls.
     list of (fnName, type) used in reduce calls.
@@ -20,42 +21,47 @@ import qualified Data.Set as Set
     list of (fnName, inType1, inType2, outType) used in combine calls.
 -}
 type SeqInfo = (Set.Set (Conc.Conc),
+                Bool,
                 Set.Set (Common.Ident, Conc.Conc),
                 Set.Set (Common.Ident, Conc.Conc, Conc.Conc),
                 Set.Set (Common.Ident, Conc.Conc),
                 Set.Set (Common.Ident, Conc.Conc),
                 Set.Set (Common.Ident, Conc.Conc, Conc.Conc, Conc.Conc))
 emptySeqInfo :: SeqInfo
-emptySeqInfo = (Set.empty, Set.empty, Set.empty, Set.empty, Set.empty,
+emptySeqInfo = (Set.empty, False, Set.empty, Set.empty, Set.empty, Set.empty,
                 Set.empty)
 addSeqType :: SeqInfo -> Conc.Conc -> SeqInfo
-addSeqType (s1, s2, s3, s4, s5, s6) c =
-  (Set.insert c s1, s2, s3, s4, s5, s6)
+addSeqType (s1, b, s2, s3, s4, s5, s6) c =
+  (Set.insert c s1, b, s2, s3, s4, s5, s6)
+addRangeCall :: SeqInfo -> SeqInfo
+addRangeCall (s1, _, s2, s3, s4, s5, s6) =
+  (s1, True, s2, s3, s4, s5, s6)
 addTabulateCall :: SeqInfo -> Common.Ident -> Conc.Conc -> SeqInfo
-addTabulateCall (s1, s2, s3, s4, s5, s6) f c =
-  (s1, Set.insert (f, c) s2, s3, s4, s5, s6)
+addTabulateCall (s1, b, s2, s3, s4, s5, s6) f c =
+  (s1, b, Set.insert (f, c) s2, s3, s4, s5, s6)
 addMapCall :: SeqInfo -> Common.Ident -> Conc.Conc -> Conc.Conc -> SeqInfo
-addMapCall (s1, s2, s3, s4, s5, s6) f c1 c2 =
-  (s1, s2, Set.insert (f, c1, c2) s3, s4, s5, s6)
+addMapCall (s1, b, s2, s3, s4, s5, s6) f c1 c2 =
+  (s1, b, s2, Set.insert (f, c1, c2) s3, s4, s5, s6)
 addReduceCall :: SeqInfo -> Common.Ident -> Conc.Conc -> SeqInfo
-addReduceCall (s1, s2, s3, s4, s5, s6) f c =
-  (s1, s2, s3, Set.insert (f, c) s4, s5, s6)
+addReduceCall (s1, b, s2, s3, s4, s5, s6) f c =
+  (s1, b, s2, s3, Set.insert (f, c) s4, s5, s6)
 addFilterCall :: SeqInfo -> Common.Ident -> Conc.Conc -> SeqInfo
-addFilterCall (s1, s2, s3, s4, s5, s6) f c =
-  (s1, s2, s3, s4, Set.insert (f, c) s5, s6)
+addFilterCall (s1, b, s2, s3, s4, s5, s6) f c =
+  (s1, b, s2, s3, s4, Set.insert (f, c) s5, s6)
 addCombineCall :: SeqInfo ->
                   Common.Ident -> Conc.Conc -> Conc.Conc -> Conc.Conc -> SeqInfo
-addCombineCall (s1, s2, s3, s4, s5, s6) f c1 c2 c3 =
-  (s1, s2, s3, s4, s5, Set.insert (f, c1, c2, c3) s6)
+addCombineCall (s1, b, s2, s3, s4, s5, s6) f c1 c2 c3 =
+  (s1, b, s2, s3, s4, s5, Set.insert (f, c1, c2, c3) s6)
 
 
 {-
   Goes before user code, to make sure gcc knows about the functions/structs.
 -}
 getSeqDecls :: SeqInfo -> [GDecl]
-getSeqDecls (seqTypes, tabulates, maps, reduces, filters, combines) =
+getSeqDecls (seqTypes, ranges, tabulates, maps, reduces, filters, combines) =
   concat [getStructDefns seqTypes,
           getStructTypedefs seqTypes,
+          getRangeDecls ranges,
           getTabulateDecls tabulates,
           getMapDecls maps,
           getReduceDecls reduces,
@@ -68,8 +74,9 @@ getSeqDecls (seqTypes, tabulates, maps, reduces, filters, combines) =
   for use.
 -}
 getSeqDefns :: SeqInfo -> [GDecl]
-getSeqDefns (seqTypes, tabulates, maps, reduces, filters, combines) =
-  concat [getTabulateDefns tabulates,
+getSeqDefns (seqTypes, ranges, tabulates, maps, reduces, filters, combines) =
+  concat [getRangeDefns ranges,
+          getTabulateDefns tabulates,
           getMapDefns maps,
           getReduceDefns reduces,
           getFilterDefns filters,
@@ -100,6 +107,12 @@ getStructTypedefs s = map getStructTypedef $ Set.elems s
         getStructTypedef c =
           let sName = seqTypeName c
           in Typedef (CStructT sName) sName
+
+getRangeDecls :: Bool -> [GDecl]
+getRangeDecls False = []
+getRangeDecls True = [FDecl (seqType Conc.IntC)
+                            (libFnName "range" "")
+                            [CParam CIntT "lo", CParam CIntT "hi"]]
 
 getTabulateDecls :: Set.Set (Common.Ident, Conc.Conc) -> [GDecl]
 getTabulateDecls s = map getTabulateDecl $ Set.elems s
@@ -143,6 +156,31 @@ getCombineDecls s = map getCombineDecl $ Set.elems s
 
 
 
+getRangeDefns :: Bool -> [GDecl]
+getRangeDefns False = []
+getRangeDefns True =
+  [FDefn (seqType Conc.IntC)
+         (libFnName "range" "")
+         [CParam CIntT "lo", CParam CIntT "hi"]
+         (getDiffLength $
+          buildSeq Conc.IntC $
+          buildLoop $
+          getLoopStmts)]
+  where getDiffLength :: [Stmt] -> [Stmt]
+        getDiffLength stmts =
+          [Exp $ Call (Ident "assert") [Binop (CmpOp $ Common.CmpOp Common.LE)
+                                              (Ident "lo") (Ident "hi")],
+           Decl CIntT nName (Just $ Binop (ArithOp Common.ASub)
+                                          (Ident "hi") (Ident "lo")) stmts]
+
+        getLoopStmts :: [Stmt]
+        getLoopStmts =
+          [Assn Common.Set
+                (LIndex (LDot (LStar $ LIdent sName) arrFieldName)
+                        (Ident iName))
+                (Binop (ArithOp Common.AAdd)
+                       (Ident iName) (Ident "lo"))]
+                        
 
 
 getTabulateDefns :: Set.Set (Common.Ident, Conc.Conc) -> [GDecl]

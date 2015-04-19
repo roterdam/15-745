@@ -542,6 +542,17 @@ checkExp (fns, gs) e = do
               return c1
           throwIf (argListsDiffer gs eCs (replicate (length eCs) headC)) $ errPrefix "all elements must be the same type"
           return $ SeqC headC
+        checkExp' (fns, gs) (RangeSeq loExp hiExp) = do
+          {-
+            Range seq literal is valid iff:
+            --> both sides have type int.
+          -}
+          let errPrefix = CheckErr "rangeSeq" $ show loExp ++ ", " ++ show hiExp
+          c1 <- checkExp (fns, gs) loExp
+          c2 <- checkExp (fns, gs) hiExp
+          throwIf (cNeq gs c1 IntC) $ errPrefix "arguments must be ints"
+          throwIf (cNeq gs c2 IntC) $ errPrefix "arguments must be ints"
+          return $ SeqC IntC
         checkExp' (fns, gs) (Map fExp seqExp) = do
           {-
             Map is valid iff:
