@@ -42,7 +42,8 @@ parseArgs args =
         fmtToExt :: [(OF, String)]
         fmtToExt = [(C0,       ".c0"),
                     (AST,      ".ast"),
-                    (C,         ".c")]
+                    (C,         ".c"),
+                    (O_AST,    ".oast")]
 
         extToFmt :: [(String, OF)]
         extToFmt = map swap fmtToExt
@@ -59,6 +60,7 @@ argTable = [
   Option []     ["unsafe"]        (NoArg $ setSafe False)         "Speicifes that the compiler should NOT check for exceptions at runtime.",
   Option []  ["c0"]               (NoArg $ setFmt C0)             "Sets the output type to be C0 (act as a pretty printer).",
   Option ['a']  ["ast"]           (NoArg $ setFmt AST)            "Produces an abstract syntax tree.",
+  Option ['f']  ["orig_ast"]      (NoArg $ setFmt O_AST)          "Produces the ast before compression",
   Option ['c']  ["c"]             (NoArg $ setFmt C)              "Proces C code."]
   where setFmt :: OF -> Job -> Job
         setFmt fmt job = job {fmt = fmt}

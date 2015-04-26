@@ -17,7 +17,7 @@ data Job = Job {
   deriving Show
 
 -- Output format.
-data OF = C0 | AST | C
+data OF = C0 | O_AST | AST | C
           deriving (Eq, Show)
 
 defaultJob :: Job
