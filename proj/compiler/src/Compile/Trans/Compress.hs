@@ -18,8 +18,7 @@ compressGDecl rest = rest
 
 -- Operates on the non-reversed list and returns a non-reversed list
 compressStmts' :: [Stmt] -> [Stmt]
-compressStmts' body = trace ("Reversed: " ++ (show $ reverse body))
-                      reverse $ compressStmts $ reverse body
+compressStmts' body = reverse $ compressStmts $ reverse body
 
 -- Compress a function body. For each statement, create
 -- a list of possible identifiers denoting sequences. For each
@@ -28,7 +27,7 @@ compressStmts' body = trace ("Reversed: " ++ (show $ reverse body))
 -- NOTE: the input is the reverse of the function body
 compressStmts :: [Stmt] -> [Stmt]
 compressStmts [] = []
-compressStmts (stmt@(Assn _ _ e):prevStmts) = trace ("Assn: " ++ show stmt)
+compressStmts (stmt@(Assn _ _ e):prevStmts) = 
   stmt:(compressStmts $ compressExp e prevStmts)
 compressStmts (stmt@(If c s1 s2):prevStmts) =
   (If c (compressStmts' s1) (compressStmts' s2)):
