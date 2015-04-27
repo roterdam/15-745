@@ -8,8 +8,8 @@ l5c:
 	chmod +x bin/*
 
 prof:
-	runhaskell Setup.hs configure --user
-	runhaskell Setup.hs build --ghc-options="-O2 -prof -auto-all"
+	runhaskell Setup.hs configure --user --enable-executable-profiling
+	runhaskell Setup.hs build --ghc-options="-O2 -prof"
 	rm -rf bin/
 	cp -r shellbins/ bin/
 	chmod +x bin/*
