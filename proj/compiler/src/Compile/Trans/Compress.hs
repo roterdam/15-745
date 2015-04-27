@@ -40,11 +40,11 @@ compressStmts (stmt@(Return Nothing):prevStmts) =
   stmt:(compressStmts prevStmts)
 compressStmts (stmt@(Return (Just e)):prevStmts) =
   stmt:(compressStmts $ compressExp e prevStmts)
--- TODO: Because of the way this is structures, the decls right now only
--- allow compressing stuff within the same scope. There is no movement
--- of stuff across scopes of variables. HOW TO FIX THAT :((
+-- TODO: Okay right now scope works but this is hella sketchy. I wanna
+-- say that what this does is pulls every declaration to the top of that basic block
+-- so really, it's just a matter of rearranging scope.
 compressStmts (stmt@(Decl t i Nothing scope):prevStmts) =
-  (Decl t i Nothing (compressStmts' scope)):compressStmts prevStmts
+ (compressStmts $ (reverse scope) ++ prevStmts) ++ [Decl t i Nothing []]
 compressStmts ((Decl t i (Just e) scope):prevStmts) =
   compressStmts $ (Decl t i Nothing $
                   (Assn Common.Set (LIdent i) e):scope):prevStmts
