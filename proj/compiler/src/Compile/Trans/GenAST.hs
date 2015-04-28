@@ -125,7 +125,7 @@ elabExp (PT.Tabulate f n) = AST.Tabulate (elabExp f) (elabExp n)
 elabExp (PT.Map f s) = AST.Map (elabExp f) (elabExp s)
 elabExp (PT.Reduce f b s) = AST.Reduce (elabExp f) (elabExp b) (elabExp s)
 elabExp (PT.Filter pred s) = AST.Filter (elabExp pred) (elabExp s)
-elabExp (PT.Combine f a b) = AST.Combine (elabExp f) (elabExp a) (elabExp b)  
+elabExp (PT.Combine f a b) = AST.Combine (elabExp f) (elabExp a) (elabExp b)
 
 -- Assumes that the input is not LOr or LAnd (which are elaborated seperately).
 elabBinop :: PT.Binop -> AST.Binop

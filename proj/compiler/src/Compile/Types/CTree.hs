@@ -72,8 +72,6 @@ data CType = CDefT Common.Ident | CStructT Common.Ident | CFnT Common.Ident
            | CPtrT CType | CIntT | CBoolT | CVoidT | CCharT deriving Eq
 
 
-
-
 {-
   Implementations of Show grouped at the end for clarity.
 -}
