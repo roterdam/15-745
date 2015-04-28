@@ -1,0 +1,21 @@
+/* Benchmark 1: Nested sequence operators */
+
+int A_constr (int i) {
+    return i;
+}
+
+int add_ten(int i){
+    return i+10;
+}
+
+int add(int a, int b){
+    return a+b;
+}
+
+int main(){
+    int<> A = tabulate A_constr 100000;
+    int<> B = map add_ten (map add_ten (map add_ten A));
+
+    int res = reduce add 0 B;
+    return res;
+}

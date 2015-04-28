@@ -1,0 +1,23 @@
+/* Benchmark 3: Printing the primes less than 100000 */
+
+int A_constr(int i){
+    return i;
+}
+
+bool isPrime(int n){
+    for (int i = 0; i < (n/2) + 1; i++){
+        if ((n % i) == 0){
+            return false;
+        }
+    }
+    return true;
+}
+
+int main(){
+
+    int<> A = tabulate A_constr 100000;
+    int<> primes = filter isPrime A;
+
+    print_seq(primes);
+    return 0;
+}

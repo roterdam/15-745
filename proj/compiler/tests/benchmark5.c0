@@ -1,0 +1,46 @@
+/* Benchmark 5: Parenthesis matching - we use the naive O(n) algorithm */
+
+int paren_to_num(bool b){
+    if (b == true){
+        // Open paren
+        return 1;
+    } else {
+        // Close paren
+        return -1;
+    }
+}
+
+int paren_combine(int prev_res, int p){
+    if (prev_res < 0) return -1; // We have mismatched parens
+    return prev_res + p;
+}
+
+bool paren_gen(int i){
+    if (i < (100000/2)){
+        return true;
+    } else {
+        return false;
+    }
+}
+
+int main(){
+
+    /* Here we use true to denote '(' and false to denote ')' */
+    bool<> seq1 = seq(true, false);
+    bool<> seq2 = seq(true, true, false, false);
+    bool<> seq3 = tabulate paren_gen 100000;
+
+    int<> paren_seq1 = map paren_to_num seq1;
+    bool is_balanced = ((reduce paren_combine 0 paren_seq1) == 0);
+
+    int<> paren_seq2 = map paren_to_num seq2;
+    is_balanced &= ((reduce paren_combine 0 paren_seq2) == 0);
+
+    int<> paren_seq3 = map paren_to_num seq3;
+    is_balanced &= ((reduce paren_combine 0 paren_seq3) == 0);
+
+    print("Paren sequences are balanced: ");
+    printbool(is_balanced);
+    
+    return 0;
+}

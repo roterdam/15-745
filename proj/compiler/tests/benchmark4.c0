@@ -1,0 +1,51 @@
+/* Benchmark 4: Testing backwards compatibility with C0 */
+
+int A_constr(int i){
+  return i*2;
+}
+
+int add(int a, int b){
+    return a+b;
+}
+
+int add_ten(int a){
+    return a+10;
+}
+
+int add_five(int a){
+    return a+5;
+}
+
+int main(){
+
+  int<> A = tabulate A_constr 10000;
+  int<> B = map add_ten A;
+
+  int x = 100;
+  int n = 50;
+  x = n;
+  x += n;
+  int<> C = map add_five B;
+  x -= n;
+  x *= n;
+  x /= n;
+  x %= n;
+
+  if ((reduce add 0 A) > 0){
+      int i = 1;
+      x += i;
+  }
+
+  x &= n;
+  x |= n;
+  x ^= n;
+  x <<= n;
+  x >>= n;
+  int c_sum = reduce add 0 C;
+
+  int<> D = seq(1..10000);
+  int d_sum = reduce add 0 D;
+
+  return add(c_sum, d_sum);
+
+}
