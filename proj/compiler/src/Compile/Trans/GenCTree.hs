@@ -30,11 +30,19 @@ assertFnName = "assert"
 callocFnName :: String
 callocFnName = "calloc"
 
+{-
+  A subset of the GlobalState used in typechecking.
+-}
+type SigMap = Map.Map Common.Ident (Conc.Conc, [Conc.Conc])
+type TypedefMap = Map.Map Common.Ident Conc.Conc
+type GlobalInfo = (SigMap, TypedefMap)
+emptyGI :: GlobalInfo
+emptyGI = (Map.empty, Map.empty)
 
-
-astToCTree :: GlobalState -> AST.AST -> CTree.CTree
-astToCTree gs (AST.Prog gDecls) =
-  let seqInfo = getSeqInfo gDecls
+astToCTree :: AST.AST -> CTree.CTree
+astToCTree (AST.Prog gDecls) =
+  let gi = foldl addInfoFromGDecl emptyGI gDecls
+      seqInfo = getSeqInfo gi gDecls
   in  CTree.Prog $ concat [stdIncludes,
                            getSeqDecls seqInfo,
                            map transGDecl gDecls,
@@ -43,114 +51,137 @@ astToCTree gs (AST.Prog gDecls) =
         stdIncludes = [CTree.Include "<stdlib.h>", CTree.Include "<stdbool.h>",
                        CTree.Include "<assert.h>"]
 
-        getSeqInfo :: [AST.GDecl] -> SeqInfo
-        getSeqInfo = foldl addFromGDecl emptySeqInfo
+        addInfoFromGDecl :: GlobalInfo -> AST.GDecl -> GlobalInfo
+        addInfoFromGDecl gi@(sigs, typedefs) (AST.Typedef t tName) =
+          (sigs, Map.insert tName (getConcrete gi t) typedefs)
+        addInfoFromGDecl gi (AST.Sigdef _ _ _) = gi
+        addInfoFromGDecl gi@(sigs, typedefs) (AST.FDecl t fName params) =
+          let resC = getConcrete gi t
+              paramsC = map (\(Common.Param t _) -> getConcrete gi t) params
+          in (Map.insert fName (resC, paramsC) sigs, typedefs)
+        addInfoFromGDecl gi@(sigs, typedefs) (AST.FExt t fName params) =
+          let resC = getConcrete gi t
+              paramsC = map (\(Common.Param t _) -> getConcrete gi t) params
+          in (Map.insert fName (resC, paramsC) sigs, typedefs)
+        addInfoFromGDecl gi@(sigs, typedefs) (AST.FDefn t fName params _) =
+          let resC = getConcrete gi t
+              paramsC = map (\(Common.Param t _) -> getConcrete gi t) params
+          in (Map.insert fName (resC, paramsC) sigs, typedefs)
+        addInfoFromGDecl gi (AST.SDefn _ _) = gi
 
-        addFromGDecl :: SeqInfo -> AST.GDecl -> SeqInfo
-        addFromGDecl si (AST.Typedef t _) = addFromType t si
-        addFromGDecl si (AST.Sigdef t _ params) =
-          addFromParams params $ addFromType t si
-        addFromGDecl si (AST.FDecl t _ params) =
-          addFromParams params $ addFromType t si
-        addFromGDecl si (AST.FExt t _ params) =
-          addFromParams params $ addFromType t si
-        addFromGDecl si (AST.FDefn t _ params stmts) =
-          addFromStmts (addFromParams params $ addFromType t si) stmts
-        addFromGDecl si (AST.SDefn _ params) = addFromParams params si
+        getSeqInfo :: GlobalInfo -> [AST.GDecl] -> SeqInfo
+        getSeqInfo gi = foldl (addFromGDecl gi) emptySeqInfo
 
-        addFromParams :: [Common.Param] -> SeqInfo -> SeqInfo
-        addFromParams params si = foldl addFromParam si params
+        addFromGDecl :: GlobalInfo -> SeqInfo -> AST.GDecl -> SeqInfo
+        addFromGDecl gi si (AST.Typedef t _) = addFromType gi t si
+        addFromGDecl gi si (AST.Sigdef t _ params) =
+          addFromParams gi params $ addFromType gi t si
+        addFromGDecl gi si (AST.FDecl t _ params) =
+          addFromParams gi params $ addFromType gi t si
+        addFromGDecl gi si (AST.FExt t _ params) =
+          addFromParams gi params $ addFromType gi t si
+        addFromGDecl gi si (AST.FDefn t _ params stmts) =
+          addFromStmts gi (addFromParams gi params $ addFromType gi t si) stmts
+        addFromGDecl gi si (AST.SDefn _ params) = addFromParams gi params si
 
-        addFromParam :: SeqInfo -> Common.Param -> SeqInfo
-        addFromParam si (Common.Param t _) = addFromType t si
+        addFromParams :: GlobalInfo -> [Common.Param] -> SeqInfo -> SeqInfo
+        addFromParams gi params si = foldl (addFromParam gi) si params
 
-        addFromStmts :: SeqInfo -> [AST.Stmt] -> SeqInfo
-        addFromStmts = foldl addFromStmt
+        addFromParam :: GlobalInfo -> SeqInfo -> Common.Param -> SeqInfo
+        addFromParam gi si (Common.Param t _) = addFromType gi t si
 
-        addFromStmt :: SeqInfo -> AST.Stmt -> SeqInfo
-        addFromStmt si (AST.Assn _ lv e) = addFromExp e $ addFromLValue lv si
-        addFromStmt si (AST.If e tStmts fStmts) =
-          addFromStmts (addFromStmts (addFromExp e si) tStmts) fStmts
-        addFromStmt si (AST.While e stmts) =
-          addFromStmts (addFromExp e si) stmts
-        addFromStmt si (AST.Return eOpt) = addFromEOpt eOpt si
-        addFromStmt si (AST.Decl t v eOpt stmts) =
-          addFromStmts (addFromEOpt eOpt $ addFromType t si) stmts
-        addFromStmt si (AST.Assert e) = addFromExp e si
-        addFromStmt si (AST.Exp e) = addFromExp e si
+        addFromStmts :: GlobalInfo -> SeqInfo -> [AST.Stmt] -> SeqInfo
+        addFromStmts gi = foldl (addFromStmt gi)
 
-        addFromExp :: AST.Exp -> SeqInfo -> SeqInfo
-        addFromExp (AST.IntLit _) si = si
-        addFromExp (AST.BoolLit _) si = si
-        addFromExp (AST.CharLit _) si = si
-        addFromExp (AST.StringLit _) si = si
-        addFromExp (AST.Ident _) si = si
-        addFromExp (AST.Binop _ e1 e2) si = addFromExp e1 $ addFromExp e2 si
-        addFromExp (AST.Unop _ e) si = addFromExp e si
-        addFromExp (AST.Cond e1 e2 e3) si =
-          addFromExp e1 $ addFromExp e2 $ addFromExp e3 si
-        addFromExp (AST.Call e es) si =
-          addFromExp e $ foldr addFromExp si es
-        addFromExp (AST.Alloc _) si = si
-        addFromExp (AST.AllocArray _ e) si = addFromExp e si
-        addFromExp (AST.Index e1 e2) si = addFromExp e1 $ addFromExp e2 si
-        addFromExp (AST.Star e) si = addFromExp e si
-        addFromExp (AST.Dot e _) si = addFromExp e si
-        addFromExp (AST.Amp _) si = si
-        addFromExp (AST.Cast _ e) si = addFromExp e si
-        addFromExp (AST.Null) si = si
-        addFromExp (AST.Tabulate (AST.Ident f) e) si =
-          let si' = addFromExp e si
-              (_, (retC, _)) = (fnSigs gs) Map.! f
+        addFromStmt :: GlobalInfo -> SeqInfo -> AST.Stmt -> SeqInfo
+        addFromStmt gi si (AST.Assn _ lv e) =
+          addFromExp gi e $ addFromLValue gi lv si
+        addFromStmt gi si (AST.If e tStmts fStmts) =
+          addFromStmts gi (addFromStmts gi (addFromExp gi e si) tStmts) fStmts
+        addFromStmt gi si (AST.While e stmts) =
+          addFromStmts gi (addFromExp gi e si) stmts
+        addFromStmt gi si (AST.Return eOpt) = addFromEOpt gi eOpt si
+        addFromStmt gi si (AST.Decl t v eOpt stmts) =
+          addFromStmts gi (addFromEOpt gi eOpt $ addFromType gi t si) stmts
+        addFromStmt gi si (AST.Assert e) = addFromExp gi e si
+        addFromStmt gi si (AST.Exp e) = addFromExp gi e si
+
+        addFromExp :: GlobalInfo -> AST.Exp -> SeqInfo -> SeqInfo
+        addFromExp _ (AST.IntLit _) si = si
+        addFromExp _ (AST.BoolLit _) si = si
+        addFromExp _ (AST.CharLit _) si = si
+        addFromExp _ (AST.StringLit _) si = si
+        addFromExp _ (AST.Ident _) si = si
+        addFromExp gi (AST.Binop _ e1 e2) si =
+          addFromExp gi e1 $ addFromExp gi e2 si
+        addFromExp gi (AST.Unop _ e) si = addFromExp gi e si
+        addFromExp gi (AST.Cond e1 e2 e3) si =
+          addFromExp gi e1 $ addFromExp gi e2 $ addFromExp gi e3 si
+        addFromExp gi (AST.Call e es) si =
+          addFromExp gi e $ foldr (addFromExp gi) si es
+        addFromExp _ (AST.Alloc _) si = si
+        addFromExp gi (AST.AllocArray _ e) si = addFromExp gi e si
+        addFromExp gi (AST.Index e1 e2) si =
+          addFromExp gi e1 $ addFromExp gi e2 si
+        addFromExp gi (AST.Star e) si = addFromExp gi e si
+        addFromExp gi (AST.Dot e _) si = addFromExp gi e si
+        addFromExp gi (AST.Amp _) si = si
+        addFromExp gi (AST.Cast _ e) si = addFromExp gi e si
+        addFromExp _ (AST.Null) si = si
+        addFromExp gi@(sigs, _) (AST.Tabulate (AST.Ident f) e) si =
+          let si' = addFromExp gi e si
+              (retC, _) = sigs Map.! f
           in addTabulateCall si' f retC
-        addFromExp (AST.ListSeq es) si = error "unimplemented"
-        addFromExp (AST.RangeSeq e1 e2) si =
-          addFromExp e2 $ addFromExp e1 $ addRangeCall $ addSeqType si Conc.IntC
-        addFromExp (AST.Map (AST.Ident f) e) si =
-          let si' = addFromExp e si
-              (_, (retC, [paramC])) = (fnSigs gs) Map.! f
+        addFromExp _ (AST.ListSeq es) si = error "unimplemented"
+        addFromExp gi (AST.RangeSeq e1 e2) si =
+          addFromExp gi e2 $ addFromExp gi e1 $ addRangeCall $
+          addSeqType si Conc.IntC
+        addFromExp gi@(sigs, _) (AST.Map (AST.Ident f) e) si =
+          let si' = addFromExp gi e si
+              (retC, [paramC]) = sigs Map.! f
           in addMapCall si' f retC paramC
-        addFromExp (AST.Reduce (AST.Ident f) e1 e2) si =
-          let si' = addFromExp e1 $ addFromExp e2 si
-              (_, (retC, _)) = (fnSigs gs) Map.! f
+        addFromExp gi@(sigs, _) (AST.Reduce (AST.Ident f) e1 e2) si =
+          let si' = addFromExp gi e1 $ addFromExp gi e2 si
+              (retC, _) = sigs Map.! f
           in addReduceCall si' f retC
-        addFromExp (AST.Filter (AST.Ident f) e) si =
-          let si' = addFromExp e si
-              (_, (_, [argC])) = (fnSigs gs) Map.! f
+        addFromExp gi@(sigs, _) (AST.Filter (AST.Ident f) e) si =
+          let si' = addFromExp gi e si
+              (_, [argC]) = sigs Map.! f
           in addFilterCall si' f argC
-        addFromExp (AST.Combine (AST.Ident f) e1 e2) si =
-          let si' = addFromExp e1 $ addFromExp e2 si
-              (_, (retC, [arg1C, arg2C])) = (fnSigs gs) Map.! f
+        addFromExp gi@(sigs, _) (AST.Combine (AST.Ident f) e1 e2) si =
+          let si' = addFromExp gi e1 $ addFromExp gi e2 si
+              (retC, [arg1C, arg2C]) = sigs Map.! f
           in addCombineCall si' f retC arg1C arg2C
 
-        addFromLValue :: AST.LValue -> SeqInfo -> SeqInfo
-        addFromLValue (AST.LIdent _) si = si
-        addFromLValue (AST.LStar lv) si = addFromLValue lv si
-        addFromLValue (AST.LDot lv _) si = addFromLValue lv si
-        addFromLValue (AST.LIndex lv e) si = addFromLValue lv $ addFromExp e si
+        addFromLValue :: GlobalInfo -> AST.LValue -> SeqInfo -> SeqInfo
+        addFromLValue gi (AST.LIdent _) si = si
+        addFromLValue gi (AST.LStar lv) si = addFromLValue gi lv si
+        addFromLValue gi (AST.LDot lv _) si = addFromLValue gi lv si
+        addFromLValue gi (AST.LIndex lv e) si =
+          addFromLValue gi lv $ addFromExp gi e si
 
-        addFromEOpt :: (Maybe AST.Exp) -> SeqInfo -> SeqInfo
-        addFromEOpt Nothing si = si
-        addFromEOpt (Just e) si = addFromExp e si
+        addFromEOpt :: GlobalInfo -> (Maybe AST.Exp) -> SeqInfo -> SeqInfo
+        addFromEOpt _ Nothing si = si
+        addFromEOpt gi (Just e) si = addFromExp gi e si
 
-        addFromType :: Common.Type -> SeqInfo -> SeqInfo
-        addFromType t si =
-          case (getConcrete t) of
+        addFromType :: GlobalInfo -> Common.Type -> SeqInfo -> SeqInfo
+        addFromType gi t si =
+          case (getConcrete gi t) of
             (Conc.SeqC c) -> addSeqType si c
             _ -> si
 
-        getConcrete :: Common.Type -> Conc.Conc
-        getConcrete Common.VoidT = Conc.VoidC
-        getConcrete Common.StringT = Conc.StringC
-        getConcrete Common.CharT = Conc.CharC
-        getConcrete Common.IntT = Conc.IntC
-        getConcrete Common.BoolT = Conc.BoolC
-        getConcrete (Common.StructT ident) = Conc.StructC ident
-        getConcrete (Common.FnT ident) = Conc.FnC ident
-        getConcrete (Common.ArrT t) = Conc.ArrC $ getConcrete t
-        getConcrete (Common.SeqT t) = Conc.SeqC $ getConcrete t
-        getConcrete (Common.PtrT t) = Conc.PtrC $ Conc.One $ getConcrete t
-        getConcrete (Common.DefT ident) = (typedefs gs) Map.! ident
+        getConcrete :: GlobalInfo -> Common.Type -> Conc.Conc
+        getConcrete _ Common.VoidT = Conc.VoidC
+        getConcrete _ Common.StringT = Conc.StringC
+        getConcrete _ Common.CharT = Conc.CharC
+        getConcrete _ Common.IntT = Conc.IntC
+        getConcrete _ Common.BoolT = Conc.BoolC
+        getConcrete _ (Common.StructT ident) = Conc.StructC ident
+        getConcrete _ (Common.FnT ident) = Conc.FnC ident
+        getConcrete gi (Common.ArrT t) = Conc.ArrC $ getConcrete gi t
+        getConcrete gi (Common.SeqT t) = Conc.SeqC $ getConcrete gi t
+        getConcrete gi (Common.PtrT t) = Conc.PtrC $ Conc.One $ getConcrete gi t
+        getConcrete (_, typedefs) (Common.DefT ident) = typedefs Map.! ident
 
 
 

@@ -1,0 +1,39 @@
+int intId(int x) {
+  return x;
+}
+
+int square(int x) {
+  return x * x;
+}
+
+int sum(int a, int b) {
+  return a + b;
+}
+
+int div10(int x) {
+  return x / 10;
+}
+
+int add5(int x) {
+  return x + 5;
+}
+
+bool isEven(int x) {
+  return x % 2 == 0;
+}
+
+bool isBiggerThan1K(int x) {
+  return x > 1000;
+}
+
+
+int main() {
+  int<> A = tabulate intId 10000;
+  int<> B = map square A;
+  int<> C = combine sum B B;
+  int<> D = map div10 C;
+  int<> E = map add5 D;
+  int<> F = filter isEven E;
+  int<> G = filter isBiggerThan1K F;
+  return reduce sum 0 G;
+}

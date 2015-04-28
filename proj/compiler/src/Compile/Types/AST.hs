@@ -109,7 +109,7 @@ instance Show AST where
   Turns a GDecl into a newline-terminated string.
 -}
 instance Show GDecl where
-  show (Typedef t ident) = joinL ["tyepdef(", show t, ", ", ident, ")\n"]
+  show (Typedef t ident) = joinL ["typedef(", show t, ", ", ident, ")\n"]
   show (Sigdef t ident params) =
     joinL ["sigdef(", show t, ", ", ident, ", ", showTuple params, ")\n"]
   show (FDecl t ident params) =
@@ -153,13 +153,16 @@ instance Show Exp where
   show Null = "NULL"
   show (Amp ident) = joinL ["&", ident]
   show (Cast t e) = joinL ["(", show t, ")(", show e, ")"]
-  show (Tabulate f e) = joinL ["tabulate ", show f, " ", show e]
-  show (ListSeq elems) = joinL ["<", (foldl (\a b -> a ++ show b ++ ",") "" elems), ">"]
+  show (Tabulate f e) = joinL ["tabulate(", show f, ", ", show e, ")"]
+  show (ListSeq elems) =
+    joinL ["<", (foldl (\a b -> a ++ show b ++ ",") "" elems), ">"]
   show (RangeSeq start end) = joinL ["<", show start, "..", show end, ">"]
-  show (Map f s) = joinL ["map ", show f, " ", show s]
-  show (Reduce f b s) = joinL ["reduce ", show f, " ", show b, " ", show s]
-  show (Filter p s) = joinL ["filter ", show p, " ", show s]
-  show (Combine f a b) = joinL ["combine ", show f, " ", show a, " ", show b]
+  show (Map f s) = joinL ["map(", show f, ", ", show s, ")"]
+  show (Reduce f b s) =
+    joinL ["reduce(", show f, ", ", show b, ", ", show s, ")"]
+  show (Filter p s) = joinL ["filter(", show p, ", ", show s, ")"]
+  show (Combine f a b) =
+    joinL ["combine(", show f, ", ", show a, ", ", show b, ")"]
 
 instance Show LValue where
   show (LIdent ident) = ident

@@ -10,6 +10,7 @@ import Compile.Trans.GenAST (ptToAST)
 import Compile.Trans.GenCTree (astToCTree)
 import Compile.Trans.Check (check)
 import Compile.Trans.Compress (compress)
+import Compile.Trans.Combine (combine)
 
 compile :: Job -> IO ()
 compile job = do
@@ -17,11 +18,12 @@ compile job = do
   pt <- liftEither job $ parseFiles job files
   let ast = ptToAST job pt
   gs <- liftEither job $ check ast
-  let ast' = compress ast
+  --let ast' = compress ast
+  let ast' = combine ast
   case fmt job of
     C0 ->  writeResult pt
     O_AST -> writeResult ast -- Before compression
     AST -> writeResult ast'  -- After compression
-    C -> writeResult $ astToCTree gs ast'
+    C -> writeResult $ astToCTree ast'
   where writeResult :: (Show s) => s -> IO ()
         writeResult = writeFile (dest job) . show
