@@ -141,7 +141,7 @@ $$\frac{\Gamma \vdash f : (\tau * \tau) \to \tau, \Gamma \vdash s : seq\;\tau,
   \Gamma \vdash b : \tau}
   {\Gamma \vdash \code{reduce}\;\code{f}\;b\;s : \tau}$$
 \\
-$$\frac{\Gamma \vdash f : \tau \to bool, \Gamma \vdash s : seq\;\tau}
+$$\frac{\Gamma \vdash p : \tau \to bool, \Gamma \vdash s : seq\;\tau}
   {\Gamma \vdash \code{filter}\;\code{p}\;s : seq\;\tau}$$
 \\
   While the rules above specify a general type $\tau$, we restrict $\tau$ to be
@@ -217,29 +217,53 @@ In this case, as a result of performing code motion on the line \code{int<> A =
 down as well. As such, we perform this optimization until convergence.\\
 
 \noindent
-Once all sequence operations have been postponed as far as possible, we have the guarantee that if two sequence operations can be directly combined, they're consecutive statements in the program. We use this to further simplify the code in anticipation of the third pass; all variable definitions and redefinitions that are used in exactly one place in the program are inlined, and the defining write line is deleted. We accomplish this by looping upwards through the code, where every time we encounter a sequence-producing operation we look at all the subsequent code to see if the variable is used before being redefined. In the case where inlining is allowed, we do so and remove the assignment line.\\
+Once all sequence operations have been postponed as far as possible, we have
+the guarantee that if two sequence operations can be directly combined, they're
+consecutive statements in the program. We use this to further simplify the code
+in anticipation of the third pass; all variable definitions and redefinitions
+that are used in exactly one place in the program are inlined, and the defining
+write line is deleted. We accomplish this by looping upwards through the code,
+where every time we encounter a sequence-producing operation we look at all the
+subsequent code to see if the variable is used before being redefined. In the
+case where inlining is allowed, we do so and remove the assignment line.\\
 
-In our third pass, once all sequence operations that are used exactly once have been inlined, we look through all the expressions in the program and iteratively replace pairs of nested operations with single operations on combined functions, as in the example above. All the newly defined functions are added to the AST at the end of the pass. The types of replacements we support are listed below in pseudocode:
+In our third pass, once all sequence operations that are used exactly once have
+been inlined, we look through all the expressions in the program and
+iteratively replace pairs of nested operations with single operations on
+combined functions, as in the example above. All the newly defined functions
+are added to the AST at the end of the pass. The types of replacements we
+support are listed below in pseudocode:
 \begin{verbatim}
-map(f2, tabulate(f1, n))
-  =>  tabulate(f2 . f1, n)
-map(f2, map(f1, s))
-  =>  map(f2 . f1, s)
-filter(f2, filter(f1, s))
-  =>  filter(f2 && f1, s)
-map(f2, combine(f, s1, s2))
-  =>  combine(f2 . f, s1, s2)
+map(f2, tabulate(f1, n)) =>
+tabulate(f2 . f1, n)
+
+map(f2, map(f1, s)) =>
+map(f2 . f1, s)
+
+filter(f2, filter(f1, s)) =>
+filter(f2 && f1, s)
+
+map(f2, combine(f, s1, s2)) =>
+combine(f2 . f, s1, s2)
 \end{verbatim}
 
 
 \noindent
-Once all sequence operations have been combined, we convert to C code by doing the following:
+Once all sequence operations have been combined, we convert to C code by doing
+the following:
 \begin{enumerate}
-\item Scan the code to make a set of all the functions passed as arguments to each map operation.
-\item For each (operation, fnName) pair, add a function that performs that operation on the input, calling the given function where appropriate.
+\item Scan the code to make a set of all the functions passed as arguments to
+  each map operation.
+\item For each (operation, fnName) pair, add a function that performs that
+  operation on the input, calling the given function where appropriate.
 \end{enumerate}
 \noindent
-Note that we do not have a single implementation of each of \sml{map}, \sml{reduce}, \sml{filter}, etc, because that would require passing a function pointer, and the overheads of calling function pointers so frequently would likely hide any speedups gained by our optimization. Instead, we generate a separate clone of the function for each input function it's passed to lower overheads and maximize the possibility of inlining by gcc.
+Note that we do not have a single implementation of each of \sml{map},
+\sml{reduce}, \sml{filter}, etc, because that would require passing a function
+pointer, and the overheads of calling function pointers so frequently would
+likely hide any speedups gained by our optimization. Instead, we generate a
+separate clone of the function for each input function it's passed to lower
+overheads and maximize the possibility of inlining by gcc.
 
 
 
@@ -255,7 +279,7 @@ information about number of data cache hits and misses.
 state when the code is run. Since it is not possible for us, without kernel
 privileges, to be sure of the cache state, we attempt to achieve a clean cache
 in between the runs of our program. We do this by running an IO-intensive
-program which writes to about $5M$ of memory - which is much bigger than the
+program which writes to about $5MB$ of memory - which is much bigger than the
 size of L1 and L2 caches put together. While there are caveats with this approach
 since one can never be sure of the mapping of data to cache lines, it is the
 best solution we could come up with in order to thrash the cache in between
@@ -269,11 +293,25 @@ $<INSERT_SPECS_FOR_MACHINE_HERE>$.
 % TODO: Include diagrams specifying speedups/slowdowns.
 % Analyze performances - why it was faster or wasn't
 
-\subsection{Lessons learnt}
-
 \section{Conclusion and Future work}
+As can be seen from our test results, we have once again shown that
+optimizations that reduce memory accesses and leverage on locality can provide
+significant performance improvements. There is plenty of room for future work
+in order to make sequence operations more efficient. One aspect which this
+project did not address would be accessesing individual elements in sequences
+and how that could affect evaluation. Consider the following code sample:
+\begin{verbatim}
+int<> C = tabulate C_constr 100000
 
-\section{Appendix} % Optional, you can make this a biblio if you want
-
-
+for (int i = 0; i < 500; i++){
+    print(C[i]);
+}
+\end{verbatim}
+Currently, our compiled code perform full evaluation of the entire sequence
+even though only part of the sequence is being used later on. One can
+potentially explore being able to statically analyze and then transform the
+above code sequence such that each element of $C$ is only evaluated as it is
+being used. Lessons learnt from this project can also be applied to code that
+work with arrays - sequences here simply provided a useful front-end for us to
+target our optimization towards.
 \end{document}
