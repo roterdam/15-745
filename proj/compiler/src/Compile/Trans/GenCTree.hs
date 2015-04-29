@@ -132,7 +132,7 @@ astToCTree (AST.Prog gDecls) =
           let si' = addFromExp gi e si
               (retC, _) = sigs Map.! f
           in addTabulateCall si' f retC
-        addFromExp _ (AST.ListSeq es) si = error "unimplemented"
+        addFromExp _ (AST.ListSeq es) si = error "List seq unimplemented"
         addFromExp gi (AST.RangeSeq e1 e2) si =
           addFromExp gi e2 $ addFromExp gi e1 $ addRangeCall $
           addSeqType si Conc.IntC
@@ -246,7 +246,7 @@ transExp (AST.Dot e ident) = CTree.Dot (transExp e) ident
 transExp (AST.Amp ident) = CTree.Amp ident
 transExp (AST.Cast t e) = CTree.Cast (transType t) (transExp e)
 transExp (AST.Null) = CTree.Null
-transExp (AST.ListSeq _) = error "unimplemented"
+transExp (AST.ListSeq _) = error "list seq unimplemented"
 transExp (AST.RangeSeq e1 e2) =
   CTree.Call (CTree.Ident $ libFnName "range" "") [transExp e1, transExp e2]
 transExp (AST.Tabulate (AST.Ident fName) e) =

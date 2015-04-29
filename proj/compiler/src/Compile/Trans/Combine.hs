@@ -386,10 +386,10 @@ combineE fnInfo (Tabulate e1 e2) =
 combineE fnInfo (ListSeq es) =
   error "ListSeq unsupported"
 combineE fnInfo (RangeSeq e1 e2) =
-  error "RangeSeq should be elaborated out before the combining optimization"
-  {-let (fnInfo', e1') = combineE fnInfo e1
+  --error "RangeSeq should be elaborated out before the combining optimization"
+  let (fnInfo', e1') = combineE fnInfo e1
       (fnInfo'', e2') = combineE fnInfo' e2
-  in (fnInfo'', RangeSeq e1' e2')-}
+  in (fnInfo'', RangeSeq e1' e2')
 combineE fnInfo (Map (Ident fName) e) =
   case (tryLocalCombine MapOp fName fnInfo e) of
     Nothing -> 

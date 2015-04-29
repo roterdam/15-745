@@ -5,7 +5,7 @@ int A_constr(int i){
 }
 
 bool isPrime(int n){
-    for (int i = 0; i < (n/2) + 1; i++){
+    for (int i = 1; i < (n/2) + 1; i++){
         if ((n % i) == 0){
             return false;
         }
@@ -13,11 +13,15 @@ bool isPrime(int n){
     return true;
 }
 
+int add(int a, int b) {
+  return a + b;
+}
+
 int main(){
 
-    int<> A = tabulate A_constr 1000000;
+    int<> A = tabulate A_constr 100000000;
     int<> primes = filter isPrime A;
+    int<> sums = combine add primes primes;
 
-    print_seq(primes);
-    return 0;
+    return reduce add 0 sums;
 }

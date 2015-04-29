@@ -18,8 +18,8 @@ int B_constr(int i){
 
 int main() {
 
-    int<> A = tabulate A_constr 1000000;
-    int<> B = tabulate B_constr 1000000;
+    int<> A = tabulate A_constr 10000000;
+    int<> B = tabulate B_constr 10000000;
 
     int<> sum = combine add A B;
     int<> mult = combine add A B;
@@ -27,10 +27,6 @@ int main() {
     int sum_all = reduce add 0 sum; // Compute the sum of elems in A and B
     int mul_all = reduce mul 1 mult;// Compute the pdt of elems in A and B
 
-    print("Sum of A and B: ");
-    printint(sum_all);
-    print("Pdt of A and B: ");
-    printint(mul_all);
-    return 0;
+    return sum_all + mul_all;
 
 }

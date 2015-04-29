@@ -18,7 +18,7 @@ int add_five(int a){
 
 int main(){
 
-  int<> A = tabulate A_constr 1000000;
+  int<> A = tabulate A_constr 100000000;
   int<> B = map add_ten A;
   int<> C = map add_five B;
 
