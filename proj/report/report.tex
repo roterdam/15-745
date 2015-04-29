@@ -30,16 +30,14 @@
 \maketitle
 
 \begin{abstract}
-Sequences are a common data structure in several functional languages and they
+Immutable sequences are a common data structure in several functional languages; they
 are usually operated on using constructs like \sml{map, filter} and
-\sml{reduce}. It is also worth noting that a common code pattern when working
-with sequences is performing consecutive \sml{map, reduce} and \sml{filter}
-operations on a sequence. In this project, we explore the possibility of a
-cache optimization which leverages on this general code pattern in order to
-improve code performance. We do so by statically analyzing the source code and
-coalescing consecutive sequence operations together, thereby reducing the number
-of total memory accesses and leveraging on locality. This optimization is a
-markedly different approach compared to cache optimizations such as tiling and
+\sml{reduce}, and it's common for code to chain multiple such operations together. In this
+project, we explore the possibility of an optimization which improves locality and
+performance on this code pattern. We do so by statically analyzing the source code and
+coalescing sequence operations together, thereby reducing the number
+of passes through memory and improving locality. This optimization is a
+markedly different approach compared to other cache optimizations such as tiling and
 rearranging loops for we are delaying computations and sometimes,
 not performing them at all. We have found that by performing this
 optimization, on our 5 benchmark tests, we have obtained $<INSERT_NUMBER_HERE>$
@@ -62,29 +60,28 @@ int<> A' = map f A
 int res = reduce (+) 0 A'
 \end{verbatim}
 
+\noindent
 Assuming that sequences are implemented as arrays, we observe the following:
 Each location in the sequence is accessed thrice - during the function calls to
-\sml{tabulate}, \sml{map} and \sml{reduce} functions. We can instead compress
-the following code such that each location in the sequence is accessed twice
-as follows:
+\sml{tabulate}, \sml{map} and \sml{reduce} functions. We can instead compose
+\sml{A_constr} with \sml{f} and replace the code with the following:
 \begin{verbatim}
 int A = tabulate (A_constr . f) 1000000
 int res = reduce (+) 0 A
 \end{verbatim}
 
+\noindent
 From this small motivating example, we can see how combining operations can
-reduce memory accesses which can provide huge performance improvements
-especially if the sequences are large enough to exceed L1 cache sizes.
+reduce memory accesses, and potentially provide large performance improvements.
 
 \subsection{Approach Overview}
 C0 is a safe subset of the C programming language developed here at CMU by
 Frank Pfenning. We chose to work with C0 to implement the above optimizations
 since it is a small and lightweight language and also due to our familiarity with it
-from 15-411. We implemented this optimization in two passes - We first
-augmented the language to include sequences as a primitive data type. This also
-involved modifying the C0 compiler to target C instead of x86-64 assembly. We
-then included additional optimization passes to perform the optimization on
-sequence operations. We have therefore have a compiler with the following pipeline:
+from 15-411. First we modified our starting compiler to generate C code instead
+of X-86 and added sequences as a primitive datatype, and then we wrote a series
+of transformation passes to coalesce sequence operations where possible. Our
+compiler currently has the following pipeline:
 \begin{enumerate}
   \item Parser
   \item Elaboration
@@ -152,10 +149,9 @@ $$\frac{\Gamma \vdash f : \tau \to bool, \Gamma \vdash s : seq\;\tau}
   \code{filter} and \code{reduce} operations on pointers and arrays are not
   reasonable or safe operations.
   \\\\
-  We also enforce that sequences are immutable in our type-checking. This means
-  that they can be defined exactly once. This is in line with the use of
-  sequences in a functional context and it also provides us with guarantees
-  that we can make use of us in our optimization passes.
+  We also enforce that sequences are immutable in our type-checking. This means that
+  their elements cannot be written to, only read, which is in line with the use of
+  sequences in a functional context and also allows for simpler optimization passes.
 \subsection{Optimization Passes}
 
 There are 3 sections in particular that we will explain here - performing
@@ -218,12 +214,35 @@ int res = reduce (+) 0 A
 \end{verbatim}
 In this case, as a result of performing code motion on the line \code{int<> A =
   map f B}, we will also be able to pull the line \code{int<> B = tabulate ...}
-down as well. As such, we perform this optimization until convergence.
+down as well. As such, we perform this optimization until convergence.\\
 
-$<TALK_ABOUT_THE_SECOND_PASS>$
-\\
-\\
-$<TALK_ABOUT_TRANSLATION_TO_C>$
+\noindent
+Once all sequence operations have been postponed as far as possible, we have the guarantee that if two sequence operations can be directly combined, they're consecutive statements in the program. We use this to further simplify the code in anticipation of the third pass; all variable definitions and redefinitions that are used in exactly one place in the program are inlined, and the defining write line is deleted. We accomplish this by looping upwards through the code, where every time we encounter a sequence-producing operation we look at all the subsequent code to see if the variable is used before being redefined. In the case where inlining is allowed, we do so and remove the assignment line.\\
+
+In our third pass, once all sequence operations that are used exactly once have been inlined, we look through all the expressions in the program and iteratively replace pairs of nested operations with single operations on combined functions, as in the example above. All the newly defined functions are added to the AST at the end of the pass. The types of replacements we support are listed below in pseudocode:
+\begin{verbatim}
+map(f2, tabulate(f1, n))
+  =>  tabulate(f2 . f1, n)
+map(f2, map(f1, s))
+  =>  map(f2 . f1, s)
+filter(f2, filter(f1, s))
+  =>  filter(f2 && f1, s)
+map(f2, combine(f, s1, s2))
+  =>  combine(f2 . f, s1, s2)
+\end{verbatim}
+
+
+\noindent
+Once all sequence operations have been combined, we convert to C code by doing the following:
+\begin{enumerate}
+\item Scan the code to make a set of all the functions passed as arguments to each map operation.
+\item For each (operation, fnName), add a function that performs that operation on the input, calling the given function where appropriate.
+\end{enumerate}
+\noindent
+Note that we do not have a single implementation of each of \sml{map}, \sml{reduce}, \sml{filter}, etc, because that would require passing a function pointer, and the overheads of calling function pointers so frequently would likely hide any speedups gained by our optimization. Instead, we generate a separate clone of the function for each input function it's passed to lower overheads and maximize the possibility of inlining by gcc.
+
+
+
 
 \section{Experimental Setup}
 The experimental setup for project is simple. We measure the performance gains
