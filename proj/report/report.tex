@@ -236,7 +236,7 @@ map(f2, combine(f, s1, s2))
 Once all sequence operations have been combined, we convert to C code by doing the following:
 \begin{enumerate}
 \item Scan the code to make a set of all the functions passed as arguments to each map operation.
-\item For each (operation, fnName), add a function that performs that operation on the input, calling the given function where appropriate.
+\item For each (operation, fnName) pair, add a function that performs that operation on the input, calling the given function where appropriate.
 \end{enumerate}
 \noindent
 Note that we do not have a single implementation of each of \sml{map}, \sml{reduce}, \sml{filter}, etc, because that would require passing a function pointer, and the overheads of calling function pointers so frequently would likely hide any speedups gained by our optimization. Instead, we generate a separate clone of the function for each input function it's passed to lower overheads and maximize the possibility of inlining by gcc.
