@@ -15,9 +15,9 @@ bool isPrime(int n){
 
 int main(){
 
-    int<> A = tabulate A_constr 100000;
+    int<> A = tabulate A_constr 1000000;
     int<> primes = filter isPrime A;
 
-    print_seq(primes);
+    /* print_seq(primes); */
     return 0;
 }

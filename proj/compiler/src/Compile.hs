@@ -14,12 +14,17 @@ import Compile.Trans.Combine (combine)
 
 compile :: Job -> IO ()
 compile job = do
+  -- parsing
   files <- readFiles job
   pt <- liftEither job $ parseFiles job files
+  -- elaboration
   let ast = ptToAST job pt
+  -- typechecking
   gs <- liftEither job $ check ast
-  --let ast' = compress ast
-  let ast' = combine ast
+  -- combining optimization
+  let ast' = (if (lvl job > 0)
+                 then combine ast
+                 else ast)
   case fmt job of
     C0 ->  writeResult pt
     O_AST -> writeResult ast -- Before compression

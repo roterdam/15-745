@@ -1,58 +1,260 @@
-\documentclass[11pt]{article}
-\usepackage{enumerate}
+\documentclass[a4paper,twocolumn]{article}
+\usepackage{times}
+\usepackage[english]{babel}
+\usepackage[utf8x]{inputenc}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{latexsym}
+\usepackage{pgfplots}
 \usepackage{hyperref}
 \usepackage{tikz}
-\usepackage{fullpage}
-\usepackage{fancyhdr}
-\usepackage{graphicx}
+\usepackage[colorinlistoftodos]{todonotes}
+\usepackage[left=2cm,right=2cm,top=2cm,bottom=2.5cm]{geometry}
+\usepackage{authblk}
+\usepackage{syntax}
+\title{Improving Cache Locality with Coalesced Sequence operations}
+\date{\vspace{-5ex}}
+\author{Rokhini Prabhu\thanks{rokhinip@gmail.com} }
+\author{Michael Choquette\thanks{mchoquet@andrew.cmu.edu}}
+\affil{Carnegie Mellon University}
 
-\usepackage{amsmath, amsfonts, amsthm, amssymb}
-\setlength{\parindent}{0pt}
-\setlength{\parskip}{5pt plus 1pt}
-\pagestyle{empty}
+\definecolor{bblue}{HTML}{4F81BD}
+\definecolor{rred}{HTML}{C0504D}
+\definecolor{ggreen}{HTML}{9BBB59}
+\definecolor{ppurple}{HTML}{9F4C7C}
 
-\def\indented#1{\list{}{}\item[]}
-\let\indented=\endlist
 
-\newcounter{questionCounter}
-\newcounter{partCounter}[questionCounter]
-\newenvironment{question}[2][\arabic{questionCounter}]{%
-    \setcounter{partCounter}{0}%
-    \vspace{.25in} \hrule \vspace{0.5em}%
-        \noindent{\bf #2}%
-    \vspace{0.8em} \hrule \vspace{.10in}%
-    \addtocounter{questionCounter}{1}%
-}{}
-\renewenvironment{part}[1][\alph{partCounter}]{%
-    \addtocounter{partCounter}{1}%
-    \vspace{.10in}%
-    \begin{indented}%
-       {\bf (#1)} %
-}{\end{indented}}
-
-%%%%%%%%%%%%%%%%% Identifying Information %%%%%%%%%%%%%%%%%
-%% This is here, so that you can make your homework look %%
-%% pretty when you compile it.                           %%
-%%     DO NOT PUT YOUR NAME ANYWHERE ELSE!!!!            %%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\newcommand{\myname}{Michael Choquette, Rokhini Prabhu}
-\newcommand{\myandrew}{mchoquet, rokhinip}
-\newcommand{\projectname}{Final Report} 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\sml}[1]{\texttt{#1}}
 
 \begin{document}
-\thispagestyle{plain}
+\maketitle
 
-\begin{center}
-{\Large \projectname} \\
-\myname \\
-\myandrew \\
-\today
-\end{center}
+\begin{abstract}
+Sequences are a common data structure in several functional languages and they
+are usually operated on using constructs like \sml{map, filter} and
+\sml{reduce}. It is also worth noting that a common code pattern when working
+with sequences is performing consecutive \sml{map, reduce} and \sml{filter}
+operations on a sequence. In this project, we explore the possibility of a
+cache optimization which leverages on this general code pattern in order to
+improve code performance. We do so by statically analyzing the source code and
+coalescing consecutive sequence operations together, thereby reducing the number
+of total memory accesses and leveraging on locality. This optimization is a
+markedly different approach compared to cache optimizations such as tiling and
+rearranging loops for we are delaying computations and sometimes,
+not performing them at all. We have found that by performing this
+optimization, on our 5 benchmark tests, we have obtained $<INSERT_NUMBER_HERE>$
+fewer cache misses on average.
+% TODO: Insert any last minute comment on how this is good/bad/not expected
+\end{abstract}
 
-\begin{question}{Grammar Modifications}
-\end{question}
+\section{Approach}
+
+\subsection{Motivation}
+Consider the following code which does a simple map-reduce operation.
+
+\begin{verbatim}
+// Constructor function
+int A_constr(int i);
+
+// Construct sequence A
+int<> A = tabulate A_constr 1000000
+int<> A' = map f A
+int res = reduce (+) 0 A'
+\end{verbatim}
+
+Assuming that sequences are implemented as arrays, we observe the following:
+Each location in the sequence is accessed thrice - during the function calls to
+\sml{tabulate}, \sml{map} and \sml{reduce} functions. We can instead compress
+the following code such that each location in the sequence is accessed twice
+as follows:
+\begin{verbatim}
+int A = tabulate (A_constr . f) 1000000
+int res = reduce (+) 0 A
+\end{verbatim}
+
+From this small motivating example, we can see how combining operations can
+reduce memory accesses which can provide huge performance improvements
+especially if the sequences are large enough to exceed L1 cache sizes.
+
+\subsection{Approach Overview}
+C0 is a safe subset of the C programming language developed here at CMU by
+Frank Pfenning. We chose to work with C0 to implement the above optimizations
+since it is a small and lightweight language and also due to our familiarity with it
+from 15-411. We implemented this optimization in two passes - We first
+augmented the language to include sequences as a primitive data type. This also
+involved modifying the C0 compiler to target C instead of x86-64 assembly. We
+then included additional optimization passes to perform the optimization on
+sequence operations. We have therefore have a compiler with the following pipeline:
+\begin{enumerate}
+  \item Parser
+  \item Elaboration
+  \item Typechecker
+  \item Optimization Passes
+  \item Translation from Abstract Syntax Tree to C code
+\end{enumerate}
+\setlength{\grammarparsep}{5pt plus 1pt minus 1pt} % increase separation between rules
+\setlength{\grammarindent}{10em} % increase separation between LHS/RHS
+
+\subsection{Language Design}
+
+\newcommand{\nonterm}[1]{$\langle${#1}$\rangle$}
+\newcommand{\OR}{\ensuremath{\ | \ \ }}
+\newcommand{\term}[1]{\textbf{#1}}
+\newcommand{\code}[1]{\texttt{#1}}
+
+We are approaching this problem by writing a source-to-source compiler that
+translates augmented C0 code to C code. Therefore, we have to set up some
+groundwork that involves grammar changes as well as specifying type checking
+rules for sequences. We have extended the C0 grammar that is defined in
+\href{http://c0.typesafety.net/doc/c0-reference.pdf}{\textit{C0 language
+    specification}} as specified in Figure 1.
+The terminal \term{ident} is used to refer to an identifier.
+
+\begin{tabular}{l}
+  \\
+\nonterm{exp-no-seq} ::= \code{(} \nonterm{exp} \code{)} \OR \nonterm{num}
+\OR \nonterm{strlit} \OR ... \\ \\
+\nonterm{sequence-follow} ::= $\epsilon$ \OR \code{,} \nonterm{exp-no-seq} \nonterm{sequence-follow} \\
+\nonterm{sequence} ::= \code{< >} \OR \code{<} \nonterm{exp-no-seq}
+														\nonterm{sequence-follow}
+														\code{>} \\
+			      \OR \code{<}\nonterm{exp}\code{..}\nonterm{exp}\code{>}
+			  \OR \code{tabulate} \term{ident} \nonterm{sequence} \\
+			      \OR \code{map} \term{ident} \nonterm{sequence} \\
+			      \OR \code{reduce} \term{ident} \nonterm{exp-no-seq} \nonterm{sequence} \\
+			      \OR \code{filter} \term{ident} \nonterm{sequence} \\\\
+\nonterm{exp} ::= \nonterm{exp-no-seq} \OR \nonterm{sequence} \\\\
+\end{tabular}
+Figure 1.0: Extension of C0 grammar to support parallel vectors.
+
+\subsection{Static Semantics}
+The static semantics and type-checking rules are also affected as follows:
+\\
+$$\frac{ }{\cdot \vdash \code{<>} : seq\;\tau}$$.
+\\
+$$\frac{\forall\; x \in arglist, \Gamma \vdash x : \tau }{\Gamma \vdash \code{<}arglist\code{>}: seq\;\tau}$$.
+\\
+$$\frac{\Gamma \vdash f : int \to \tau, \Gamma \vdash n : int}
+  {\Gamma \vdash \code{tabulate}\;\code{f}\;n : seq\;\tau}$$
+\\
+$$\frac{\Gamma \vdash f : \tau \to \tau', \Gamma \vdash s : seq\;\tau}
+  {\Gamma \vdash \code{map}\;\code{f}\;s : seq\;\tau'}$$
+\\
+$$\frac{\Gamma \vdash f : (\tau * \tau) \to \tau, \Gamma \vdash s : seq\;\tau,
+  \Gamma \vdash b : \tau}
+  {\Gamma \vdash \code{reduce}\;\code{f}\;b\;s : \tau}$$
+\\
+$$\frac{\Gamma \vdash f : \tau \to bool, \Gamma \vdash s : seq\;\tau}
+  {\Gamma \vdash \code{filter}\;\code{p}\;s : seq\;\tau}$$
+\\
+  While the rules above specify a general type $\tau$, we restrict $\tau$ to be
+  to be either an $int$, $bool$ or $char$. This is because \code{map},
+  \code{filter} and \code{reduce} operations on pointers and arrays are not
+  reasonable or safe operations.
+  \\\\
+  We also enforce that sequences are immutable in our type-checking. This means
+  that they can be defined exactly once. This is in line with the use of
+  sequences in a functional context and it also provides us with guarantees
+  that we can make use of us in our optimization passes.
+\subsection{Optimization Passes}
+
+There are 3 sections in particular that we will explain here - performing
+modified reverse lazy code motion on the sequence operations, combining sequence
+operations together and finally translating to the target language. It is worth
+noting that unlike the optimizations that we have discussed in class, this
+optimization occurs on the Abstract Syntax Tree level. This gives us alot of
+additional information - such as types - to work with but at the same time, it
+is, far more complex than the usual 3 address form.
+\\
+\\
+As a first pass, we perform reverse lazy code motion on sequence
+operations. This means that \code{tabulate}, \code{map}, \code{reduce} and
+\code{filter} operations are pushed as far down as they can possibly be within
+a basic block. We do this because there might be code patterns as follows:
+\begin{verbatim}
+int<> A = tabulate A_constr 10000;
+/* Large block of non-sequence
+   related code */
+int<> A' = map f A
+\end{verbatim}
+In such a case, we try to move the operations as close together as possible so
+that we can identify opportunities for coalescing related sequence operations
+that are close together.
+\\
+\\We are then faced with the question of how far one can push-down these
+sequence operations. We take a more conservative approach to this compared to
+LCM. We stop the code motion of an operation on sequence $S$ if the next
+statement in program order, satisfies one of the following conditions:
+\begin{enumerate}
+\item Is a sequence operation - \code{map}, \code{filter}, \code{reduce}
+on sequence $S$
+\item Is a conditional - \code{if} statement
+\item Is a loop
+\end{enumerate}
+The first condition is straightforward - it is due to a clear case of true
+dependence. In the second case, we are conservative about moving
+operations into conditionals since we don't know which branches will
+be executed - we will have to ensure that all control flow paths eventually
+perform the sequence operation which can lead to repeated code. To avoid this
+scenario, we stop the code motion. In the third scenario, we avoid moving
+sequence computations into loops for 2 reasons - loops could possibly never
+execute which means we would need the computation to happen outside the loop
+anyway and we would like to to avoid recomputing sequences
+multiple times in the loop.
+\\
+\\As such, we perform this first pass as a backwards analysis - we identify
+potential sequences during our backwards traversal. We then explore the
+remainder of the upwardly exposed program to find the statement that defines
+these sequences. This then allows us to perform a forward analysis to pull the
+statements down as far down as possible. Note that as a result of moving a
+sequence operation down, we might also have a cascading effect of being able to
+move a related sequence down. Consider the following case:
+\begin{verbatim}
+int<> B = tabulate B_constr 10000;
+int<> A = map f B;
+/* Large block of non-sequence
+   related code */
+int res = reduce (+) 0 A
+\end{verbatim}
+In this case, as a result of performing code motion on the line \code{int<> A =
+  map f B}, we will also be able to pull the line \code{int<> B = tabulate ...}
+down as well. As such, we perform this optimization until convergence.
+
+$<TALK_ABOUT_THE_SECOND_PASS>$
+\\
+\\
+$<TALK_ABOUT_TRANSLATION_TO_C>$
+
+\section{Experimental Setup}
+The experimental setup for project is simple. We measure the performance gains
+of our optimization two-fold. We first time the execution time of the final
+binary and compare the final results. Secondly, for a more nuanced picture, we
+also use \code{valgrind}, specially with the \code{cachegrind} option for
+information about number of data cache hits and misses.
+\\
+\\In both of these measurement scenarios, we are influenced heavily by the
+state when the code is run. Since it is not possible for us, without kernel
+privileges, to be sure of the cache state, we attempt to achieve a clean cache
+in between the runs of our program. We do this by running an IO-intensive
+program which writes to about $5M$ of memory - which is much bigger than the
+size of L1 and L2 caches put together. While there are caveats with this approach
+since one can never be sure of the mapping of data to cache lines, it is the
+best solution we could come up with in order to thrash the cache in between
+runs of our benchmark tests.
+\\
+\\ The experiments mentioned above have been performed on a Intel
+$<INSERT_SPECS_FOR_MACHINE_HERE>$.
+\section{Evaluation}
+
+\subsection{Tests}
+% TODO: Include diagrams specifying speedups/slowdowns.
+% Analyze performances - why it was faster or wasn't
+
+\subsection{Lessons learnt}
+
+\section{Conclusion and Future work}
+
+\section{Appendix} % Optional, you can make this a biblio if you want
+
 
 \end{document}

@@ -16,7 +16,7 @@ int paren_combine(int prev_res, int p){
 }
 
 bool paren_gen(int i){
-    if (i < (100000/2)){
+    if (i < (1000000/2)){
         return true;
     } else {
         return false;
@@ -28,7 +28,7 @@ int main(){
     /* Here we use true to denote '(' and false to denote ')' */
     bool<> seq1 = seq(true, false);
     bool<> seq2 = seq(true, true, false, false);
-    bool<> seq3 = tabulate paren_gen 100000;
+    bool<> seq3 = tabulate paren_gen 1000000;
 
     int<> paren_seq1 = map paren_to_num seq1;
     bool is_balanced = ((reduce paren_combine 0 paren_seq1) == 0);
@@ -41,6 +41,6 @@ int main(){
 
     print("Paren sequences are balanced: ");
     printbool(is_balanced);
-    
+
     return 0;
 }
