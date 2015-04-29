@@ -40,9 +40,7 @@ of passes through memory and improving locality. This optimization is a
 markedly different approach compared to other cache optimizations such as tiling and
 rearranging loops for we are delaying computations and sometimes,
 not performing them at all. We have found that by performing this
-optimization, on our 5 benchmark tests, we have obtained $<INSERT_NUMBER_HERE>$
-fewer cache misses on average.
-% TODO: Insert any last minute comment on how this is good/bad/not expected
+optimization we have achieved significant speedups on 2 of on our 4 benchmark tests.
 \end{abstract}
 
 \section{Approach}
@@ -267,16 +265,9 @@ overheads and maximize the possibility of inlining by gcc.
 
 
 
-
 \section{Experimental Setup}
-The experimental setup for project is simple. We measure the performance gains
-of our optimization two-fold. We first time the execution time of the final
-binary and compare the final results. Secondly, for a more nuanced picture, we
-also use \code{valgrind}, specially with the \code{cachegrind} option for
-information about number of data cache hits and misses.
-\\
-\\In both of these measurement scenarios, we are influenced heavily by the
-state when the code is run. Since it is not possible for us, without kernel
+The experimental setup for project is simple; we measure the performance gains
+of our optimization with the time command. Since it is not possible for us, without kernel
 privileges, to be sure of the cache state, we attempt to achieve a clean cache
 in between the runs of our program. We do this by running an IO-intensive
 program which writes to about $5MB$ of memory - which is much bigger than the
@@ -285,13 +276,28 @@ since one can never be sure of the mapping of data to cache lines, it is the
 best solution we could come up with in order to thrash the cache in between
 runs of our benchmark tests.
 \\
-\\ The experiments mentioned above have been performed on a Intel
-$<INSERT_SPECS_FOR_MACHINE_HERE>$.
+\\ The experiments mentioned above have been performed on a Intel 2.6Ghz Core i5 processor, with 16Gb of RAM.
 \section{Evaluation}
 
 \subsection{Tests}
-% TODO: Include diagrams specifying speedups/slowdowns.
-% Analyze performances - why it was faster or wasn't
+Here is how our optimized and unoptimized code performed on the benchmark tests:\\\\
+\begin{tabular}{|c|c|c|}
+\hline
+Test		&	-O0		&	-O2\\
+\hline
+bench1	&	1.481	&	0.709\\
+\hline
+bench2	&	0.121	&	0.124\\
+\hline
+bench3	&	0.655	&	0.654\\
+\hline
+bench4	&	0.704	&	0.467\\
+\hline
+\end{tabular}\\
+
+\noindent
+Bench2 had no room for combining, and bench3 was compute-bound instead of
+bandwidth-bound, but the other two tests got 52\% and 34\% speedups respectively.
 
 \section{Conclusion and Future work}
 As can be seen from our test results, we have once again shown that
