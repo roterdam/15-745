@@ -29,7 +29,7 @@ bool isBiggerThan1K(int x) {
 }
 
 int main() {
-  int<> A = tabulate intId 1000000;
+  int<> A = tabulate intId 100000000;
   int<> B = map square A;
   int<> C = combine sum B B;
   int<> D = map div10 C;

@@ -20,12 +20,12 @@ int main(){
 
   int<> A = tabulate A_constr 1000000;
   int<> B = map add_ten A;
+  int<> C = map add_five B;
 
   int x = 100;
   int n = 50;
   x = n;
   x += n;
-  int<> C = map add_five B;
   x -= n;
   x *= n;
   x /= n;
@@ -43,7 +43,7 @@ int main(){
   x >>= n;
   int c_sum = reduce add 0 C;
 
-  int<> D = seq(1..10000);
+  int<> D = seq(1..1000000);
   int d_sum = reduce add 0 D;
 
   return add(c_sum, d_sum);

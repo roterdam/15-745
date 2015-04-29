@@ -27,7 +27,7 @@ int main(){
 
     /* Here we use true to denote '(' and false to denote ')' */
     bool<> seq1 = seq(true, false);
-    bool<> seq2 = seq(true, true, false, false);
+    bool<> seq2 = seq(true, false, true, false);
     bool<> seq3 = tabulate paren_gen 1000000;
 
     int<> paren_seq1 = map paren_to_num seq1;
