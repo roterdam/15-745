@@ -17,7 +17,6 @@ outlist.pop(1)
 outFile = "".join(outlist + [".c"])
 exec_name = outlist[0]
 
-gen_c = ["./bin/c0c", "-v", "-l", "15411c1.h0", inputFile]
 
 def flush_caches():
     print "Flushing cache..."
@@ -26,30 +25,31 @@ def flush_caches():
 
 
 def genExec(has_opt):
-    global gen_c
     global exec_name
     global outFile
+    gen_c = ["./bin/c0c", "-v", "-l", "15411c1.h0", inputFile]
 
     name = exec_name
     if has_opt:
-        gen_c += ["--optimization=2"]
+        gen_c += ["-O2"]
         name += "_opt"
     else:
-        gen_c += ["--optimization=0"]
+        gen_c += ["-O0"]
 
     # Make sure to remove old versions of the file
     if os.path.exists(outFile):
-        print "Removing old out file"
+        print "rm %s" % outFile
         os.unlink(outFile)
     if os.path.exists(name):
-        print "Removing old exec"
+        print "rm %s" % name
         os.unlink(name)
 
+    print " ".join(gen_c)
     subprocess.call(gen_c)
 
-    print "Generating ", name
     gen_exec = ["gcc", "-O3", outFile, "15411c1.c",
                 "-o", name]
+    print " ".join(gen_exec)
     subprocess.call(gen_exec)
 
 genExec(True)

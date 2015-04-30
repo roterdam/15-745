@@ -1,6 +1,7 @@
 /* Libary 15411c1 */
 /* consists of conio, string, file, and 15411 */
 
+#include <ctype.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
