@@ -1,0 +1,28 @@
+/* Returns the number of factors of a number */
+
+int nthStartingFromOne(int x) {
+  return x + 1;
+}
+
+bool isFactor(int x) {
+  return 100000000 % x == 0;
+}
+
+int allOnes(int x) {
+  return 1;
+}
+
+int add(int a, int b) {
+  return a + b;
+}
+
+int getLength(int<> s) {
+  int<> s2 = map allOnes s;
+  return reduce add 0 s2;
+}
+
+int main() {
+  int<> is = tabulate nthStartingFromOne 100000000;
+  int<> factors = filter isFactor is;
+  return getLength(factors);
+}

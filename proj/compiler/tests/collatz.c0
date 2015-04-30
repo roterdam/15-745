@@ -1,0 +1,42 @@
+/* Computes the max time to convergence under collatz iteration for all numbers
+ * in 1..n */
+
+int addOne(int x) {
+  return x + 1;
+}
+
+int allOnes(int x) {
+  return 1;
+}
+
+int add(int a, int b) {
+  return a + b;
+}
+
+int length(int<> s) {
+  int<> s2 = map allOnes s;
+  return reduce add 0 s2;
+}
+
+int collatzStep(int x) {
+  if (x % 2 == 0) {
+    return x / 2;
+  }
+  return x * 3 + 1;
+}
+
+bool notOne(int x) {
+  return x != 1;
+}
+
+int main() {
+  int n = 110000;
+  int round = 0;
+  int<> nums = tabulate addOne n;
+  while (length(nums) > 0) {
+    round += 1;
+    nums = map collatzStep nums;
+    nums = filter notOne nums;
+  }
+  return round;
+}

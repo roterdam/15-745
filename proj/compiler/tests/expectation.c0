@@ -1,0 +1,28 @@
+/* Computes E[XY], where X and Y are drawn uniformly at random from 0..9999 */
+/* NOTE: this code is broken because I don't have floats. The performance
+ * characteristics should be equivalent though, so it's ok to use as a
+ * benchmark. */
+
+int div10K(int i) {
+  return i / 10000;
+}
+
+int mod10K(int i) {
+  return i % 10000;
+}
+
+int mul(int a, int b) {
+  return a * b;
+}
+
+int add(int a, int b) {
+  return a + b;
+}
+
+int main() {
+  /* If I had floats I'd use them here :( */
+  int<> s1 = tabulate div10K 100000000;
+  int<> s2 = tabulate mod10K 100000000;
+  int<> products = combine mul s1 s2;
+  return (reduce add 0 products) / 100000000;
+}

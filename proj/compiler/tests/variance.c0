@@ -1,0 +1,33 @@
+/* Computes the variance of n "random" ints */
+
+int intId(int x) {
+  return x;
+}
+
+int get_rand(int seed) {
+    int x = ((seed >> 16) ^ seed) * 0x45d9f3b;
+    x = ((x >> 16) ^ x) * 0x45d9f3b;
+    x = ((x >> 16) ^ x);
+    return x;
+}
+
+int<> get_random_nums(int n) {
+  int<> seeds = tabulate intId n;
+  return map get_rand seeds;
+}
+
+int square(int x) {
+  return x * x;
+}
+
+int add(int a, int b) {
+  return a * b;
+}
+
+int main() {
+  int<> nums = get_random_nums(100000000);
+  int<> sqs = map square nums;
+  int sqSum = reduce add 0 sqs;
+  int sum = reduce add 0 nums;
+  return sqSum - square(sum);
+}
