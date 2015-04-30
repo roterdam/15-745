@@ -1,0 +1,5 @@
+collatz: 0.129 -> 0.126
+countFactors: 0.556 -> 0.548
+expectation: 0.872 -> 0.867
+parens: 0.440 -> 0.345
+variance: 0.863 -> 0.637
