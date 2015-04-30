@@ -131,7 +131,7 @@ astToCTree (AST.Prog gDecls) =
         addFromExp gi@(sigs, _) (AST.Tabulate (AST.Ident f) e) si =
           let si' = addFromExp gi e si
               (retC, _) = sigs Map.! f
-          in addTabulateCall si' f retC
+          in addTabulateCall (addSeqType si' retC) f retC
         addFromExp _ (AST.ListSeq es) si = error "List seq unimplemented"
         addFromExp gi (AST.RangeSeq e1 e2) si =
           addFromExp gi e2 $ addFromExp gi e1 $ addRangeCall $
@@ -139,7 +139,7 @@ astToCTree (AST.Prog gDecls) =
         addFromExp gi@(sigs, _) (AST.Map (AST.Ident f) e) si =
           let si' = addFromExp gi e si
               (retC, [paramC]) = sigs Map.! f
-          in addMapCall si' f retC paramC
+          in addMapCall (addSeqType si' retC) f paramC retC
         addFromExp gi@(sigs, _) (AST.Reduce (AST.Ident f) e1 e2) si =
           let si' = addFromExp gi e1 $ addFromExp gi e2 si
               (retC, _) = sigs Map.! f
@@ -151,7 +151,7 @@ astToCTree (AST.Prog gDecls) =
         addFromExp gi@(sigs, _) (AST.Combine (AST.Ident f) e1 e2) si =
           let si' = addFromExp gi e1 $ addFromExp gi e2 si
               (retC, [arg1C, arg2C]) = sigs Map.! f
-          in addCombineCall si' f retC arg1C arg2C
+          in addCombineCall (addSeqType si' retC) f arg1C arg2C retC
 
         addFromLValue :: GlobalInfo -> AST.LValue -> SeqInfo -> SeqInfo
         addFromLValue gi (AST.LIdent _) si = si

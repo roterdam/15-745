@@ -11,11 +11,9 @@ if (len(args) != 2):
     print_usage()
     sys.exit(1);
 
-inputFile = args[1]
-outlist = inputFile.split(".")
-outlist.pop(1)
-outFile = "".join(outlist + [".c"])
-exec_name = outlist[0]
+inPath = args[1]
+(inDir, inFileName) = os.path.split(inPath)
+outPath = os.path.join("test_out", ".".join(inFileName.split(".")[:-1]))
 
 
 def flush_caches():
@@ -25,30 +23,23 @@ def flush_caches():
 
 
 def genExec(has_opt):
-    global exec_name
-    global outFile
-    gen_c = ["./bin/c0c", "-v", "-l", "15411c1.h0", inputFile]
 
-    name = exec_name
-    if has_opt:
-        gen_c += ["-O2"]
-        name += "_opt"
-    else:
-        gen_c += ["-O0"]
+    path = (outPath + "_opt") if has_opt else outPath 
 
-    # Make sure to remove old versions of the file
-    if os.path.exists(outFile):
-        print "rm %s" % outFile
-        os.unlink(outFile)
-    if os.path.exists(name):
-        print "rm %s" % name
-        os.unlink(name)
-
+    cFilePath = path + ".c"
+    gen_c = ["./bin/c0c", "-v", "-l", "15411c1.h0",
+             "-O2" if has_opt else "-O0", inPath, "-o", cFilePath]
+    if os.path.exists(cFilePath):
+        print "rm %s" % cFilePath
+        os.unlink(cFilePath)
     print " ".join(gen_c)
     subprocess.call(gen_c)
 
-    gen_exec = ["gcc", "-O3", outFile, "15411c1.c",
-                "-o", name]
+    execPath = path
+    gen_exec = ["gcc", "-O3", cFilePath, "15411c1.c", "-o", execPath]
+    if os.path.exists(execPath):
+        print "rm %s" % execPath
+        os.unlink(execPath)
     print " ".join(gen_exec)
     subprocess.call(gen_exec)
 
